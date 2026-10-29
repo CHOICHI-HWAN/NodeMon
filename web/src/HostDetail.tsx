@@ -2,11 +2,12 @@ import { api, RANGES, type Host, type RangeKey } from "./api";
 import { fmtAgo, fmtBytes, fmtPct, fmtRate, pct } from "./format";
 import { usePoll } from "./hooks";
 import { LineChart } from "./LineChart";
-import { RangePicker, Status } from "./Overview";
+import { DEMO } from "./env";
+import { Meter, RangePicker, Status } from "./Overview";
 
-type Props = { host: Host | undefined; color: string; now: number; range: RangeKey; onRange: (r: RangeKey) => void; onDeleted: () => void };
+type Props = { host: Host | undefined; showBack: boolean; color: string; now: number; range: RangeKey; onRange: (r: RangeKey) => void; onDeleted: () => void };
 
-export function HostDetail({ host, color, now, range, onRange, onDeleted }: Props) {
+export function HostDetail({ host, showBack, color, now, range, onRange, onDeleted }: Props) {
   const id = host?.id ?? -1;
   const sec = RANGES.find((r) => r.key === range)!.sec;
   const { data, loading } = usePoll(
@@ -34,7 +35,7 @@ export function HostDetail({ host, color, now, range, onRange, onDeleted }: Prop
 
   return (
     <>
-      <a className="back" href="#/">← 전체 보기</a>
+      {showBack && <a className="back" href="#/">← 전체 보기</a>}
       <div className="toolbar">
         <div className="title-row">
           <span className="key" style={{ background: color }} />
@@ -46,9 +47,21 @@ export function HostDetail({ host, color, now, range, onRange, onDeleted }: Prop
         </div>
         <div className="toolbar-right">
           <RangePicker value={range} onChange={onRange} />
-          <button className="danger" onClick={remove}>삭제</button>
+          {!DEMO && <button className="danger" onClick={remove}>삭제</button>}
         </div>
       </div>
+      {host.latest && (
+        <section className="card now" aria-label="현재 상태">
+          <Meter label="CPU" value={host.latest.cpu} detail={`부하 ${host.latest.load1.toFixed(2)}`} />
+          <Meter label="메모리" value={pct(host.latest.mem_used, host.latest.mem_total)} detail={`${fmtBytes(host.latest.mem_used)} / ${fmtBytes(host.latest.mem_total)}`} />
+          <Meter label="디스크" value={pct(host.latest.disk_used, host.latest.disk_total)} detail={`${fmtBytes(host.latest.disk_used)} / ${fmtBytes(host.latest.disk_total)}`} />
+          <div className="net-now">
+            <span>네트워크</span>
+            <strong>↓ {fmtRate(host.latest.net_rx)}</strong>
+            <strong>↑ {fmtRate(host.latest.net_tx)}</strong>
+          </div>
+        </section>
+      )}
       <div className="grid charts">
         <LineChart title="CPU 사용률" {...range2} fmt={fmtPct} max={100} series={[{ key: "cpu", label: "CPU", color, values: pts.map((p) => p.cpu) }]} />
         <LineChart

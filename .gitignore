@@ -6,3 +6,4 @@ server/webdist/*
 *.db-*
 .env
 dist/
+dist-demo/

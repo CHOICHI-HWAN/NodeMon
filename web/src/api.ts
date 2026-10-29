@@ -1,3 +1,6 @@
+import { demoApi } from "./demo";
+import { DEMO } from "./env";
+
 export type Sample = {
   cpu: number;
   mem_used: number;
@@ -35,7 +38,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   return res.status === 204 ? (undefined as T) : res.json();
 }
 
-export const api = {
+const realApi = {
   me: () => req<User>("/api/me"),
   overview: () => req<{ hosts: Host[]; now: number }>("/api/overview"),
   metrics: (id: number, range: string) =>
@@ -44,6 +47,8 @@ export const api = {
   createCode: () => req<EnrollCode>("/api/enroll-codes", { method: "POST" }),
   logout: () => req<void>("/auth/logout", { method: "POST" }),
 };
+
+export const api: typeof realApi = DEMO ? demoApi : realApi;
 
 export const RANGES = [
   { key: "15m", label: "15분", sec: 15 * 60 },

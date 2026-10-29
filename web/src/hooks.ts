@@ -1,4 +1,17 @@
 import { useEffect, useState } from "react";
+import { DEMO } from "./env";
+
+let demoHash = "#/";
+const ROUTE_EVENT = "nm-route";
+
+export function navigate(h: string) {
+  if (DEMO) {
+    demoHash = h;
+    window.dispatchEvent(new Event(ROUTE_EVENT));
+  } else {
+    window.location.hash = h;
+  }
+}
 
 export function usePoll<T>(fn: () => Promise<T>, deps: unknown[], ms = 10000) {
   const [data, setData] = useState<T | null>(null);
@@ -32,11 +45,12 @@ export function usePoll<T>(fn: () => Promise<T>, deps: unknown[], ms = 10000) {
 }
 
 export function useHash(): string {
-  const [h, setH] = useState(window.location.hash || "#/");
+  const read = () => (DEMO ? demoHash : window.location.hash || "#/");
+  const [h, setH] = useState(read());
   useEffect(() => {
-    const f = () => setH(window.location.hash || "#/");
-    window.addEventListener("hashchange", f);
-    return () => window.removeEventListener("hashchange", f);
+    const f = () => setH(read());
+    window.addEventListener(DEMO ? ROUTE_EVENT : "hashchange", f);
+    return () => window.removeEventListener(DEMO ? ROUTE_EVENT : "hashchange", f);
   }, []);
   return h;
 }
