@@ -1,0 +1,8 @@
+node_modules/
+web/dist/
+server/webdist/*
+!server/webdist/.gitkeep
+*.db
+*.db-*
+.env
+dist/

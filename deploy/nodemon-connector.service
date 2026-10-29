@@ -1,0 +1,12 @@
+[Unit]
+Description=NodeMon connector
+After=network-online.target netdata.service
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/nodemon-connector --config /etc/nodemon/connector.json
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
