@@ -133,6 +133,14 @@ func (f *fbClient) dbURL(path, token string, extra url.Values) (string, error) {
 
 // db performs one REST call; a 401 triggers a single token refresh and retry.
 func (f *fbClient) db(method, path string, body any, extra url.Values) ([]byte, error) {
+	if method != http.MethodGet {
+		// By default the database echoes every write back; silent skips that download (it counts against the free quota).
+		merged := url.Values{"print": {"silent"}}
+		for k, v := range extra {
+			merged[k] = v
+		}
+		extra = merged
+	}
 	for attempt := 0; ; attempt++ {
 		tok, err := f.token()
 		if err != nil {
@@ -155,7 +163,7 @@ func (f *fbClient) db(method, path string, body any, extra url.Values) ([]byte, 
 		b, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		switch {
-		case resp.StatusCode == http.StatusOK:
+		case resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent:
 			return b, nil
 		case resp.StatusCode == http.StatusUnauthorized && attempt == 0:
 			f.idToken = "" // force a fresh token, then retry once
