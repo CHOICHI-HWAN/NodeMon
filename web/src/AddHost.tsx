@@ -34,7 +34,7 @@ export function AddHost({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", esc);
   }, [onClose]);
 
-  const args = code ? `--server ${code.server} --code ${code.code}` : "";
+  const args = code?.args ?? "";
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal card" role="dialog" aria-modal="true" aria-label="컴퓨터 추가" onClick={(e) => e.stopPropagation()}>

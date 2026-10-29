@@ -169,3 +169,5 @@ th { position: sticky; top: 0; background: var(--surface); color: var(--ink-2); 
 .now { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px 24px; margin-bottom: 16px; align-items: start; }
 .net-now { display: flex; flex-direction: column; gap: 2px; font-variant-numeric: tabular-nums; }
 .net-now strong { font-weight: 600; }
+.emu { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--grid); padding-top: 12px; }
+.emu input { font: inherit; color: var(--ink); background: var(--page); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }

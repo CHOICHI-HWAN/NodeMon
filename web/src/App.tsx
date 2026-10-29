@@ -11,15 +11,16 @@ import { Overview } from "./Overview";
 
 export default function App() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
+  const load = useCallback(() => api.me().then(setUser).catch((e) => e instanceof Unauthorized || setUser(null)), []);
   useEffect(() => {
-    api.me().then(setUser).catch((e) => e instanceof Unauthorized || setUser(null));
+    load();
     const f = () => setUser(null);
     window.addEventListener("nm-unauthorized", f);
     return () => window.removeEventListener("nm-unauthorized", f);
-  }, []);
+  }, [load]);
 
   if (user === undefined) return null;
-  if (user === null) return <Login />;
+  if (user === null) return <Login onLogin={load} />;
   return <Dashboard user={user} />;
 }
 
@@ -31,11 +32,11 @@ function Dashboard({ user }: { user: User }) {
   const { data, error } = usePoll(() => api.overview(), [mode], 10000);
   const hosts = data?.hosts ?? [];
   const now = data?.now ?? Math.floor(Date.now() / 1000);
-  const colors = useMemo(() => hostColors(hosts.map((h) => h.id)), [hosts]);
+  const colors = useMemo(() => hostColors(hosts), [hosts]);
   const closeAdd = useCallback(() => setAdding(false), []);
 
-  const m = hash.match(/^#\/host\/(\d+)/);
-  const hostId = m ? Number(m[1]) : null;
+  const m = hash.match(/^#\/host\/([^/]+)/);
+  const hostId = m ? decodeURIComponent(m[1]) : null;
   // With a single computer the list view adds nothing, so open its detail directly.
   const host = hosts.find((h) => h.id === hostId) ?? (hosts.length === 1 ? hosts[0] : undefined);
 
@@ -62,7 +63,7 @@ function Dashboard({ user }: { user: User }) {
 
   const logout = async () => {
     await api.logout();
-    window.location.href = "/";
+    window.location.reload();
   };
 
   return (
@@ -85,7 +86,7 @@ function Dashboard({ user }: { user: User }) {
             <HostDetail
               host={host}
               showBack={hosts.length > 1}
-              color={colors.get(host?.id ?? -1) ?? "var(--series-1)"}
+              color={colors.get(host?.id ?? "") ?? "var(--series-1)"}
               now={now}
               range={range}
               onRange={setRange}

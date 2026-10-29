@@ -1,4 +1,4 @@
-import { api, RANGES, type Host, type RangeKey } from "./api";
+import { api, pollMs, RANGES, type Host, type RangeKey } from "./api";
 import { fmtAgo, fmtBytes, fmtPct, fmtRate, pct } from "./format";
 import { usePoll } from "./hooks";
 import { LineChart } from "./LineChart";
@@ -8,12 +8,12 @@ import { Meter, RangePicker, Status } from "./Overview";
 type Props = { host: Host | undefined; showBack: boolean; color: string; now: number; range: RangeKey; onRange: (r: RangeKey) => void; onDeleted: () => void };
 
 export function HostDetail({ host, showBack, color, now, range, onRange, onDeleted }: Props) {
-  const id = host?.id ?? -1;
+  const id = host?.id ?? "";
   const sec = RANGES.find((r) => r.key === range)!.sec;
   const { data, loading } = usePoll(
     async () => ({ ...(await api.metrics(id, range)), to: Math.floor(Date.now() / 1000) }),
     [id, range],
-    5000,
+    pollMs(range),
   );
   if (!host) {
     return (

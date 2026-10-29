@@ -7,9 +7,11 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "build:demo": "tsc --noEmit && vite build --mode demo",
+    "build:firebase": "tsc --noEmit && vite build --mode firebase",
     "preview": "vite preview"
   },
   "dependencies": {
+    "firebase": "^10.14.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

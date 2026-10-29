@@ -1,4 +1,4 @@
-import type { Host, Point, EnrollCode, User } from "./api";
+import type { Api, Host, Point } from "./api";
 
 export type DemoMode = "single" | "multi";
 export const demoState: { mode: DemoMode } = { mode: "multi" };
@@ -52,8 +52,8 @@ function points(s: Spec, rangeSec: number, now: number): { points: Point[]; buck
 const RANGE_SEC: Record<string, number> = { "15m": 900, "1h": 3600, "6h": 21600, "24h": 86400, "7d": 604800, "30d": 2592000 };
 const delay = <T,>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), 120));
 
-export const demoApi = {
-  me: () => delay<User>({ id: 1, email: "demo@example.com", name: "Demo" }),
+export const demoApi: Api = {
+  me: () => delay({ id: 1, email: "demo@example.com", name: "Demo" }),
   overview: () => {
     const now = Math.floor(Date.now() / 1000);
     const hosts: Host[] = specs().map((s) => {
@@ -63,15 +63,15 @@ export const demoApi = {
         const t = Math.floor(now / 60) * 60 - i * 60;
         spark.push(t > last ? null : sample(s, t).cpu);
       }
-      return { id: s.id, name: s.name, os: s.os, online: now - last < 60, last_seen: last, latest: { ...sample(s, last) }, cpu_spark: spark };
+      return { id: String(s.id), created_at: s.id, name: s.name, os: s.os, online: now - last < 60, last_seen: last, latest: { ...sample(s, last) }, cpu_spark: spark };
     });
     return delay({ hosts, now });
   },
-  metrics: (id: number, range: string) => {
-    const s = SPECS.find((x) => x.id === id) as Spec;
+  metrics: (id, range) => {
+    const s = SPECS.find((x) => x.id === Number(id)) as Spec;
     return delay(points(s, RANGE_SEC[range] ?? 3600, Math.floor(Date.now() / 1000)));
   },
-  deleteHost: (_id: number) => delay<void>(undefined),
-  createCode: () => delay<EnrollCode>({ code: "7KQ4-M9XD-2WHP", expires_at: Math.floor(Date.now() / 1000) + 900, server: "https://nodemon.example.com" }),
+  deleteHost: () => delay<void>(undefined),
+  createCode: () => delay({ code: "7KQ4-M9XD-2WHP", expires_at: Math.floor(Date.now() / 1000) + 900, args: "--firebase-api-key AIza… --firebase-db-url https://your-project-default-rtdb.firebaseio.com --code 7KQ4-M9XD-2WHP" }),
   logout: () => delay<void>(undefined),
 };

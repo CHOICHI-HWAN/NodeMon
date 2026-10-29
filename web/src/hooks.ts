@@ -20,6 +20,7 @@ export function usePoll<T>(fn: () => Promise<T>, deps: unknown[], ms = 10000) {
   useEffect(() => {
     let stop = false;
     const run = async () => {
+      if (document.hidden) return; // no point downloading while nobody is looking
       try {
         const d = await fn();
         if (!stop) {
@@ -35,9 +36,12 @@ export function usePoll<T>(fn: () => Promise<T>, deps: unknown[], ms = 10000) {
     setLoading(true);
     run();
     const t = setInterval(run, ms);
+    const onVisible = () => !document.hidden && run();
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       stop = true;
       clearInterval(t);
+      document.removeEventListener("visibilitychange", onVisible);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);

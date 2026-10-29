@@ -28,9 +28,11 @@ export function fmtAgo(t: number, now: number): string {
   return `${Math.floor(s / 86400)}일 전`;
 }
 
-// Hosts get a categorical slot by id order, so a host keeps its color when others come and go.
-export function hostColors(ids: number[]): Map<number, string> {
-  const m = new Map<number, string>();
-  [...ids].sort((a, b) => a - b).forEach((id, i) => m.set(id, i < 8 ? `var(--series-${i + 1})` : "var(--muted)"));
+// Hosts get a categorical slot by registration order, so a host keeps its color when others come and go.
+export function hostColors(hosts: { id: string; created_at: number }[]): Map<string, string> {
+  const m = new Map<string, string>();
+  [...hosts]
+    .sort((a, b) => a.created_at - b.created_at || a.id.localeCompare(b.id))
+    .forEach((h, i) => m.set(h.id, i < 8 ? `var(--series-${i + 1})` : "var(--muted)"));
   return m;
 }

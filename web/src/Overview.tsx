@@ -1,4 +1,4 @@
-import { api, RANGES, type Host, type Point, type RangeKey } from "./api";
+import { api, pollMs, RANGES, type Host, type Point, type RangeKey } from "./api";
 import { fmtAgo, fmtPct, fmtRate, fmtBytes, pct } from "./format";
 import { usePoll } from "./hooks";
 import { LineChart } from "./LineChart";
@@ -34,7 +34,7 @@ export function Meter({ label, value, detail }: { label: string; value: number; 
 function HostCard({ h, color, now }: { h: Host; color: string; now: number }) {
   const l = h.latest;
   return (
-    <a className={`card host-card${h.online ? "" : " offline"}`} href={`#/host/${h.id}`}>
+    <a className={`card host-card${h.online ? "" : " offline"}`} href={`#/host/${encodeURIComponent(h.id)}`}>
       <header>
         <span className="key" style={{ background: color }} />
         <h3>{h.name}</h3>
@@ -78,7 +78,7 @@ export function RangePicker({ value, onChange }: { value: RangeKey; onChange: (r
 type Props = {
   hosts: Host[];
   now: number;
-  colors: Map<number, string>;
+  colors: Map<string, string>;
   range: RangeKey;
   onRange: (r: RangeKey) => void;
   onAdd: () => void;
@@ -90,9 +90,10 @@ export function Overview({ hosts, now, colors, range, onRange, onAdd }: Props) {
   const { data, loading } = usePoll(
     async () => {
       const entries = await Promise.all(hosts.map(async (h) => [h.id, (await api.metrics(h.id, range)).points] as const));
-      return { map: new Map<number, Point[]>(entries), to: Math.floor(Date.now() / 1000) };
+      return { map: new Map<string, Point[]>(entries), to: Math.floor(Date.now() / 1000) };
     },
     [key, range],
+    pollMs(range),
   );
 
   if (hosts.length === 0) {
@@ -106,7 +107,7 @@ export function Overview({ hosts, now, colors, range, onRange, onAdd }: Props) {
   }
 
   const refs = hosts.map((h) => ({ id: h.id, name: h.name, color: colors.get(h.id) as string }));
-  const map = data?.map ?? new Map<number, Point[]>();
+  const map = data?.map ?? new Map<string, Point[]>();
   const to = data?.to ?? now;
   const cpu = mergeHosts(refs, map, (p) => p.cpu);
   const mem = mergeHosts(refs, map, (p) => pct(p.mem_used, p.mem_total));
