@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strings"
@@ -236,11 +237,19 @@ func (a *agg) mean() sample {
 	return sample{a.sum.CPU / d, a.sum.MemUsed / d, a.sum.MemTotal / d, a.sum.DiskUsed / d, a.sum.DiskTotal / d, a.sum.NetRx / d, a.sum.NetTx / d, a.sum.Load1 / d}
 }
 
+func round(v float64, places int) float64 {
+	p := math.Pow10(places)
+	return math.Round(v*p) / p
+}
+
 // record is the stored shape of a sample; extra holds the time field ("t" for averages, "ts" for latest).
+// Values are rounded because averages otherwise print as 17-digit floats, which would double the upload size.
 func record(s sample, extra map[string]any) map[string]any {
 	m := map[string]any{
-		"cpu": s.CPU, "mem_used": s.MemUsed, "mem_total": s.MemTotal,
-		"disk_used": s.DiskUsed, "disk_total": s.DiskTotal, "net_rx": s.NetRx, "net_tx": s.NetTx, "load1": s.Load1,
+		"cpu": round(s.CPU, 2), "load1": round(s.Load1, 2),
+		"mem_used": round(s.MemUsed, 0), "mem_total": round(s.MemTotal, 0),
+		"disk_used": round(s.DiskUsed, 0), "disk_total": round(s.DiskTotal, 0),
+		"net_rx": round(s.NetRx, 0), "net_tx": round(s.NetTx, 0),
 	}
 	for k, v := range extra {
 		m[k] = v
@@ -248,61 +257,115 @@ func record(s sample, extra map[string]any) map[string]any {
 	return m
 }
 
-// fbSink writes the live value every push, plus one-minute and one-hour averages.
-// Averages keep long-range charts cheap to download on the free plan.
+// fbSink measures often but uploads rarely: samples are averaged locally, and every uploadEvery
+// the latest value and any finished one-minute / one-hour buckets go out in ONE request.
+// Each request carries a long auth token, so fewer requests is what saves data.
 type fbSink struct {
-	f          *fbClient
-	minStart   time.Time
-	min        agg
-	hourStart  time.Time
-	hour       agg
-	lastPruned time.Time
+	f           *fbClient
+	uploadEvery time.Duration
+	minStart    time.Time
+	min         agg
+	hourStart   time.Time
+	hour        agg
+	last        sample
+	queue       map[string]any // finished buckets not yet uploaded, keyed by database path
+	noBatch     bool           // set if the database refuses multi-path updates; we then write path by path
+	lastAttempt time.Time
+	fails       int // consecutive failed uploads; drives the back-off
+	lastPruned  time.Time
 }
 
-func newFBSink(f *fbClient) *fbSink { return &fbSink{f: f} }
+const maxQueued = 2000 // roughly a day of minute buckets; beyond this we drop the backlog rather than grow forever
+
+func newFBSink(f *fbClient, uploadEvery time.Duration) *fbSink {
+	return &fbSink{f: f, uploadEvery: uploadEvery, queue: map[string]any{}}
+}
 
 func (s *fbSink) Push(sm sample) error {
 	now := s.f.now().UTC()
-	if err := s.rollover(now); err != nil {
-		return err
-	}
+	s.rollover(now)
 	s.min.add(sm)
-	// ".sv" asks the database for its own clock, so online detection ignores this computer's clock.
-	body := record(sm, map[string]any{"ts": map[string]string{".sv": "timestamp"}})
-	_, err := s.f.db("PUT", "latest/"+s.f.cfg.UID, body, nil)
-	if err == nil {
-		s.pruneIfDue(now)
+	s.last = sm
+	if !s.lastAttempt.IsZero() && now.Sub(s.lastAttempt) < s.wait() {
+		return nil
 	}
-	return err
+	return s.flush(now)
 }
 
-// rollover flushes finished minute and hour buckets before a sample from a newer bucket is added.
-func (s *fbSink) rollover(now time.Time) error {
+// wait is the pause before the next upload attempt. After failures it doubles (up to 15 minutes), so a
+// computer that was removed from the dashboard, or is offline, does not keep spending data on rejected requests.
+func (s *fbSink) wait() time.Duration {
+	w := s.uploadEvery
+	for i := 0; i < s.fails && w < 15*time.Minute; i++ {
+		w *= 2
+	}
+	if w > 15*time.Minute && s.uploadEvery <= 15*time.Minute {
+		w = 15 * time.Minute
+	}
+	return w
+}
+
+// flush sends the queued buckets plus the latest value as a single multi-path update.
+func (s *fbSink) flush(now time.Time) error {
+	s.lastAttempt = now
+	update := make(map[string]any, len(s.queue)+1)
+	for k, v := range s.queue {
+		update[k] = v
+	}
+	// ".sv" asks the database for its own clock, so online detection ignores this computer's clock.
+	update["latest/"+s.f.cfg.UID] = record(s.last, map[string]any{"ts": map[string]string{".sv": "timestamp"}})
+	if err := s.send(update); err != nil {
+		s.fails++
+		if len(s.queue) > maxQueued {
+			s.queue = map[string]any{}
+		}
+		return err
+	}
+	s.queue = map[string]any{}
+	s.fails = 0
+	s.pruneIfDue(now)
+	return nil
+}
+
+// send uploads the update in one request. If the database denies the multi-path form, it falls back
+// to one write per path; if that is denied too, the device itself has lost access.
+func (s *fbSink) send(update map[string]any) error {
+	if !s.noBatch {
+		_, err := s.f.db("PATCH", "", update, nil)
+		if err == nil || !errors.Is(err, errDenied) {
+			return err
+		}
+	}
+	for path, v := range update {
+		if _, err := s.f.db("PUT", path, v, nil); err != nil {
+			return err
+		}
+		s.noBatch = true
+	}
+	return nil
+}
+
+// rollover closes finished minute and hour buckets (no network) before a newer sample is added.
+func (s *fbSink) rollover(now time.Time) {
 	minute := now.Truncate(time.Minute)
 	if s.min.n > 0 && !minute.Equal(s.minStart) {
 		avg := s.min.mean()
-		path := fmt.Sprintf("m/%s/%s/%d", s.f.cfg.UID, s.minStart.Format("20060102"), s.minStart.Unix())
+		uid := s.f.cfg.UID
+		s.queue[fmt.Sprintf("m/%s/%s/%d", uid, s.minStart.Format("20060102"), s.minStart.Unix())] = record(avg, map[string]any{"t": s.minStart.Unix()})
 		s.hour.add(avg)
 		if s.hourStart.IsZero() {
 			s.hourStart = s.minStart.Truncate(time.Hour)
 		}
 		s.min = agg{}
-		if _, err := s.f.db("PUT", path, record(avg, map[string]any{"t": s.minStart.Unix()}), nil); err != nil {
-			return err
-		}
 		if hour := minute.Truncate(time.Hour); !hour.Equal(s.hourStart) {
 			start, havg := s.hourStart, s.hour.mean()
 			s.hour, s.hourStart = agg{}, time.Time{}
-			hp := fmt.Sprintf("h/%s/%s/%d", s.f.cfg.UID, start.Format("200601"), start.Unix())
-			if _, err := s.f.db("PUT", hp, record(havg, map[string]any{"t": start.Unix()}), nil); err != nil {
-				return err
-			}
+			s.queue[fmt.Sprintf("h/%s/%s/%d", uid, start.Format("200601"), start.Unix())] = record(havg, map[string]any{"t": start.Unix()})
 		}
 	}
 	if s.min.n == 0 || !minute.Equal(s.minStart) {
 		s.minStart = minute
 	}
-	return nil
 }
 
 // pruneIfDue deletes day/month buckets that are past retention. It runs at start-up and then daily.

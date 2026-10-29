@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AddHost } from "./AddHost";
-import { api, Unauthorized, type RangeKey, type User } from "./api";
+import { api, OVERVIEW_POLL_MS, Unauthorized, type RangeKey, type User } from "./api";
 import { demoState, type DemoMode } from "./demo";
 import { DEMO } from "./env";
 import { hostColors } from "./format";
@@ -33,7 +33,7 @@ function Dashboard({ user }: { user: User }) {
   const [paused, setPaused] = useState(false);
   const [adding, setAdding] = useState(false);
   const [mode, setMode] = useState<DemoMode>(demoState.mode);
-  const { data, error } = usePoll(() => api.overview(), [mode], paused ? 0 : 10000);
+  const { data, error } = usePoll(() => api.overview(), [mode], paused ? 0 : OVERVIEW_POLL_MS);
   const hosts = data?.hosts ?? [];
   const now = data?.now ?? Math.floor(Date.now() / 1000);
   const colors = useMemo(() => hostColors(hosts), [hosts]);

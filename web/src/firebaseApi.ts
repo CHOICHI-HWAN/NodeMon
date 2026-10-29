@@ -91,6 +91,29 @@ async function readBuckets(kind: "m" | "h", id: string, from: number, to: number
   return out.sort((a, b) => a.t - b.t);
 }
 
+// Minute and hour buckets never change once written, so a refresh only needs the buckets after the last
+// one we already hold. That turns a repeated multi-hour download into a few hundred bytes.
+const bucketCache = new Map<string, { from: number; pts: Point[] }>();
+const KEEP_SEC = 31 * 86400;
+
+async function readCached(kind: "m" | "h", id: string, from: number, to: number): Promise<Point[]> {
+  const key = `${kind}:${id}`;
+  const hit = bucketCache.get(key);
+  let pts: Point[];
+  let coverage = from;
+  if (hit && hit.from <= from && hit.pts.length) {
+    pts = hit.pts.concat(await readBuckets(kind, id, hit.pts[hit.pts.length - 1].t + 1, to));
+    coverage = hit.from;
+  } else {
+    pts = await readBuckets(kind, id, from, to);
+  }
+  const floor = to - KEEP_SEC; // bound memory in tabs that stay open for days
+  if (coverage < floor) coverage = floor;
+  pts = pts.filter((p) => p.t >= coverage);
+  bucketCache.set(key, { from: coverage, pts });
+  return pts.filter((p) => p.t >= from);
+}
+
 function downsample(points: Point[], bucket: number): Point[] {
   const groups = new Map<number, Point[]>();
   for (const p of points) {
@@ -109,7 +132,7 @@ async function spark(id: string, nowSec: number): Promise<(number | null)[]> {
   const hit = sparkCache.get(id);
   if (hit && nowSec - hit.at < 60) return hit.values;
   const start = Math.floor(nowSec / 60) * 60 - 29 * 60;
-  const pts = await readBuckets("m", id, start, nowSec);
+  const pts = await readCached("m", id, start, nowSec);
   const values: (number | null)[] = Array(30).fill(null);
   for (const p of pts) {
     const i = Math.round((p.t - start) / 60);
@@ -171,7 +194,7 @@ export const firebaseApi: Api = {
     const to = Math.floor(serverNowMs() / 1000);
     const from = to - sec;
     const long = sec > 24 * 3600; // week/month views read hourly averages instead of minute ones
-    const pts = await readBuckets(long ? "h" : "m", id, from, to);
+    const pts = [...(await readCached(long ? "h" : "m", id, from, to))]; // copy: the cache must not gain the live point below
     // Extend the chart to "now" with the live value, which is ahead of the last finished minute.
     const latest = (await get(ref(db, `latest/${id}`))).val() as (Record<string, number> & { ts: number }) | null;
     if (latest && Math.floor(latest.ts / 1000) > (pts[pts.length - 1]?.t ?? 0) && Math.floor(latest.ts / 1000) >= from) {

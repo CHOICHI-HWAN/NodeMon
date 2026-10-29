@@ -2,11 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -94,7 +97,7 @@ func TestEmulatorEnrollAndRollup(t *testing.T) {
 	base := time.Now().UTC().Truncate(time.Hour).Add(-3 * time.Hour)
 	clock := base.Add(10 * time.Minute)
 	fc.now = func() time.Time { return clock }
-	sink := newFBSink(fc)
+	sink := newFBSink(fc, time.Minute)
 
 	// A bucket far past retention should be pruned on the first push.
 	emuStale := map[string]any{"t": 1577836800, "cpu": 1, "mem_used": 1, "mem_total": 1, "disk_used": 1, "disk_total": 1, "net_rx": 0, "net_tx": 0, "load1": 0}
@@ -109,13 +112,18 @@ func TestEmulatorEnrollAndRollup(t *testing.T) {
 		}
 	}
 	for _, cpu := range []float64{10, 20, 30} {
-		push(cpu)
+		push(cpu) // the first push uploads at once; the rest are held back until a minute has passed
 		clock = clock.Add(10 * time.Second)
 	}
+	var first map[string]float64
+	json.Unmarshal(emuDo(t, "GET", "latest/"+saved.UID, ownerTok, nil), &first)
+	if first["cpu"] != 10 {
+		t.Fatalf("only the first sample should have been uploaded so far: %v", first)
+	}
 	clock = base.Add(11 * time.Minute)
-	push(50) // flushes minute :10 (mean 20)
+	push(50) // a minute has passed: uploads latest and the finished minute :10 (mean 20) together
 	clock = base.Add(time.Hour + 5*time.Minute)
-	push(60) // flushes minute :11 (mean 50) and the hour (mean 35); token must be refreshed here
+	push(60) // uploads minute :11 (mean 50) and the hour (mean 35); token must be refreshed here
 
 	var latest map[string]float64
 	json.Unmarshal(emuDo(t, "GET", "latest/"+saved.UID, ownerTok, nil), &latest)
@@ -141,7 +149,156 @@ func TestEmulatorEnrollAndRollup(t *testing.T) {
 
 	// Removing the device from the dashboard must cut it off.
 	emuDo(t, "DELETE", "devices/"+saved.UID, ownerTok, nil)
+	clock = clock.Add(2 * time.Minute) // past the upload interval, so the next push really uploads
 	if err := sink.Push(sample{CPU: 1}); err == nil {
 		t.Fatal("a removed device should be denied")
+	}
+}
+
+// A failed upload must not lose finished buckets; they ride along with the next successful one.
+func TestSinkKeepsBacklogUntilUploadSucceeds(t *testing.T) {
+	var fail bool
+	var bodies []map[string]json.RawMessage
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if fail {
+			http.Error(w, "boom", http.StatusInternalServerError)
+			return
+		}
+		if r.Method == http.MethodPatch { // uploads only; ignore the daily prune reads
+			var m map[string]json.RawMessage
+			json.NewDecoder(r.Body).Decode(&m)
+			bodies = append(bodies, m)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	clock := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+	fc := newFBClient(srv.Client(), &fbSaved{APIKey: "k", DatabaseURL: srv.URL, UID: "dev1"})
+	fc.idToken, fc.expiry, fc.now = "tok", clock.Add(24*time.Hour), func() time.Time { return clock }
+	sink := newFBSink(fc, time.Minute)
+	sm := sample{CPU: 10, MemTotal: 2, DiskTotal: 2}
+
+	if err := sink.Push(sm); err != nil { // first push uploads immediately
+		t.Fatal(err)
+	}
+	fail = true
+	clock = clock.Add(time.Minute)
+	if err := sink.Push(sm); err == nil {
+		t.Fatal("expected the upload to fail")
+	}
+	clock = clock.Add(10 * time.Second) // too soon: back-off means no new attempt, so no error and no request
+	if err := sink.Push(sm); err != nil {
+		t.Fatalf("a push inside the back-off window must not retry: %v", err)
+	}
+	clock = clock.Add(2 * time.Minute)
+	if err := sink.Push(sm); err == nil {
+		t.Fatal("expected the upload to fail again")
+	}
+	fail = false
+	clock = clock.Add(5 * time.Minute) // past the doubled wait
+	if err := sink.Push(sm); err != nil {
+		t.Fatal(err)
+	}
+	last := bodies[len(bodies)-1]
+	buckets := 0
+	for k := range last {
+		if strings.HasPrefix(k, "m/dev1/") {
+			buckets++
+		}
+	}
+	if buckets < 3 {
+		t.Fatalf("backlog lost: expected >= 3 minute buckets in one request, got %d (%v)", buckets, last)
+	}
+	if _, ok := last["latest/dev1"]; !ok || len(bodies) != 2 {
+		t.Fatalf("expected latest in a single batched request, bodies=%d", len(bodies))
+	}
+}
+
+// If multi-path updates are refused, uploads continue path by path; a revoked device stays denied.
+func TestSinkFallsBackToSinglePathWrites(t *testing.T) {
+	var patches, puts int
+	var revoked bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/v1/token") { // a 401 makes the client refresh its token first
+			w.Write([]byte(`{"id_token":"tok2","refresh_token":"r2","expires_in":"3600"}`))
+			return
+		}
+		if revoked || r.Method == http.MethodPatch {
+			patches++
+			http.Error(w, "denied", http.StatusUnauthorized)
+			return
+		}
+		if r.Method == http.MethodPut {
+			puts++
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	clock := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+	fc := newFBClient(srv.Client(), &fbSaved{APIKey: "k", DatabaseURL: srv.URL, TokenURL: srv.URL, UID: "dev1", RefreshToken: "r"})
+	fc.idToken, fc.expiry, fc.now = "tok", clock.Add(24*time.Hour), func() time.Time { return clock }
+	sink := newFBSink(fc, time.Minute)
+	sm := sample{CPU: 10, MemTotal: 2, DiskTotal: 2}
+
+	if err := sink.Push(sm); err != nil {
+		t.Fatalf("fallback should have succeeded: %v", err)
+	}
+	if !sink.noBatch || puts == 0 {
+		t.Fatalf("expected a switch to single-path writes (noBatch=%v puts=%d)", sink.noBatch, puts)
+	}
+	before := patches
+	clock = clock.Add(time.Minute)
+	if err := sink.Push(sm); err != nil || patches != before {
+		t.Fatalf("after switching it must not try PATCH again (err=%v)", err)
+	}
+
+	// A different sink whose device was removed: everything is denied, and that must surface.
+	revoked = true
+	gone := newFBSink(fc, time.Minute)
+	if err := gone.Push(sm); !errors.Is(err, errDenied) {
+		t.Fatalf("expected errDenied for a revoked device, got %v", err)
+	}
+}
+
+// Real averages are long floats; rounding keeps each bucket small, which is what the upload cost depends on.
+func TestRecordStaysSmallForRealisticValues(t *testing.T) {
+	var a agg
+	for _, cpu := range []float64{12.345678901234, 40.1111111111, 7.77777777777} {
+		a.add(sample{CPU: cpu, MemUsed: 8123456789.123, MemTotal: 17179869184, DiskUsed: 412345678901.7, DiskTotal: 1e12, NetRx: 123456.789012, NetTx: 7654.321098, Load1: 1.2345678})
+	}
+	b, _ := json.Marshal(record(a.mean(), map[string]any{"t": int64(1793280000)}))
+	if len(b) > 230 {
+		t.Fatalf("bucket body is %d bytes: %s", len(b), b)
+	}
+	if regexp.MustCompile(`\.\d{3,}`).Match(b) { // more than two decimals means a value was not rounded
+		t.Fatalf("values were not rounded: %s", b)
+	}
+}
+
+// A removed device must back off instead of retrying (and refreshing its token) on every measurement.
+func TestRejectedDeviceBacksOff(t *testing.T) {
+	var requests int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if strings.HasPrefix(r.URL.Path, "/v1/token") {
+			w.Write([]byte(`{"id_token":"tok2","refresh_token":"r2","expires_in":"3600"}`))
+			return
+		}
+		http.Error(w, "denied", http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+	clock := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+	fc := newFBClient(srv.Client(), &fbSaved{APIKey: "k", DatabaseURL: srv.URL, TokenURL: srv.URL, UID: "d", RefreshToken: "r"})
+	fc.idToken, fc.expiry, fc.now = "tok", clock.Add(24*time.Hour), func() time.Time { return clock }
+	sink := newFBSink(fc, time.Minute)
+	for i := 0; i < 360; i++ { // an hour of 10-second measurements
+		sink.Push(sample{CPU: 1})
+		clock = clock.Add(10 * time.Second)
+	}
+	t.Logf("rejected device: %d requests in one hour", requests)
+	if requests > 60 {
+		t.Fatalf("a rejected device sent %d requests in an hour; back-off is not working", requests)
 	}
 }

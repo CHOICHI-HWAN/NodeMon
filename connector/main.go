@@ -132,7 +132,8 @@ func main() {
 		code      = flag.String("code", "", "one-time enrollment code from the dashboard")
 		name      = flag.String("name", hostname, "display name for this computer")
 		netdata   = flag.String("netdata", "http://127.0.0.1:19999", "local Netdata agent URL")
-		interval  = flag.Duration("interval", 10*time.Second, "send interval")
+		interval  = flag.Duration("interval", 10*time.Second, "how often to measure (server backend: also how often to send)")
+		upload    = flag.Duration("upload-every", time.Minute, "Firebase backend: how often to upload; measurements in between are averaged locally")
 		cfgPath   = flag.String("config", defaultConfigPath(), "path of the saved credentials")
 	)
 	flag.Parse()
@@ -170,7 +171,7 @@ func main() {
 	switch cfg.backend() {
 	case "firebase":
 		fc := newFBClient(client, cfg.Firebase)
-		out = newFBSink(fc)
+		out = newFBSink(fc, *upload)
 		// Firebase may rotate the refresh token; keep the saved copy current.
 		last := cfg.Firebase.RefreshToken
 		persist = func() {
@@ -185,7 +186,7 @@ func main() {
 		out = httpSink{c: client, server: cfg.Server, key: cfg.APIKey}
 	}
 
-	log.Printf("sending metrics from %s via %s backend every %s", *netdata, cfg.backend(), *interval)
+	log.Printf("measuring %s every %s, backend %s", *netdata, *interval, cfg.backend())
 	for ; ; time.Sleep(*interval) {
 		charts, err := fetchNetdata(client, *netdata)
 		if err != nil {

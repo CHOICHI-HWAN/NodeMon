@@ -98,6 +98,10 @@ export const RANGES = [
 export type RangeKey = (typeof RANGES)[number]["key"];
 
 // Long ranges change slowly, so refetching them often only burns bandwidth (it matters on the free Firebase plan).
+// With Firebase the connector uploads about once a minute, so polling faster than that finds nothing new.
+const FIREBASE = import.meta.env.VITE_BACKEND === "firebase";
 export function pollMs(range: RangeKey): number {
-  return { "15m": 30_000, "1h": 60_000, "6h": 180_000, "24h": 300_000, "7d": 600_000, "30d": 600_000 }[range];
+  const base = { "15m": 30_000, "1h": 60_000, "6h": 180_000, "24h": 300_000, "7d": 600_000, "30d": 600_000 }[range];
+  return FIREBASE ? Math.max(60_000, base) : base;
 }
+export const OVERVIEW_POLL_MS = FIREBASE ? 30_000 : 10_000;
