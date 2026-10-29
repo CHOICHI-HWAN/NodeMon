@@ -7,7 +7,10 @@ import { hostColors } from "./format";
 import { HostDetail } from "./HostDetail";
 import { navigate, useHash, usePoll } from "./hooks";
 import { Login } from "./Login";
+import { Nodes } from "./Nodes";
 import { Overview } from "./Overview";
+import { Sidebar } from "./Sidebar";
+import { RangeMenu } from "./ui";
 
 export default function App() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
@@ -27,9 +30,10 @@ export default function App() {
 function Dashboard({ user }: { user: User }) {
   const hash = useHash();
   const [range, setRange] = useState<RangeKey>("1h");
+  const [paused, setPaused] = useState(false);
   const [adding, setAdding] = useState(false);
   const [mode, setMode] = useState<DemoMode>(demoState.mode);
-  const { data, error } = usePoll(() => api.overview(), [mode], 10000);
+  const { data, error } = usePoll(() => api.overview(), [mode], paused ? 0 : 10000);
   const hosts = data?.hosts ?? [];
   const now = data?.now ?? Math.floor(Date.now() / 1000);
   const colors = useMemo(() => hostColors(hosts), [hosts]);
@@ -37,15 +41,14 @@ function Dashboard({ user }: { user: User }) {
 
   const m = hash.match(/^#\/host\/([^/]+)/);
   const hostId = m ? decodeURIComponent(m[1]) : null;
-  // With a single computer the list view adds nothing, so open its detail directly.
-  const host = hosts.find((h) => h.id === hostId) ?? (hosts.length === 1 ? hosts[0] : undefined);
+  const host = hosts.find((h) => h.id === hostId);
+  const page = hostId != null ? "host" : hash.startsWith("#/nodes") ? "nodes" : "overview";
 
   // The demo runs inside a frame that only allows plain #name hashes, so route in memory.
   useEffect(() => {
     if (!DEMO) return;
     const f = (e: MouseEvent) => {
-      const a = (e.target as HTMLElement).closest("a");
-      const href = a?.getAttribute("href");
+      const href = (e.target as HTMLElement).closest("a")?.getAttribute("href");
       if (href?.startsWith("#/")) {
         e.preventDefault();
         navigate(href);
@@ -55,45 +58,55 @@ function Dashboard({ user }: { user: User }) {
     return () => document.removeEventListener("click", f);
   }, []);
 
-  const switchMode = (m: DemoMode) => {
-    demoState.mode = m;
+  const switchMode = (next: DemoMode) => {
+    demoState.mode = next;
     navigate("#/");
-    setMode(m);
+    setMode(next);
   };
-
   const logout = async () => {
     await api.logout();
     window.location.reload();
   };
 
+  const title =
+    page === "overview" ? (
+      <h1>개요 <span className="crumb">모든 노드</span></h1>
+    ) : page === "nodes" ? (
+      <h1>노드</h1>
+    ) : (
+      <h1><a href="#/nodes" className="crumb-link">노드</a><span className="sep">/</span>{host?.name ?? "알 수 없음"}</h1>
+    );
+
   return (
-    <div className="app">
-      {DEMO && <DemoBar mode={mode} onMode={switchMode} />}
-      <header className="top">
-        <a className="brand" href="#/">NodeMon</a>
-        <div className="top-right">
-          <span className="sub user" title={user.email}>{user.email}</span>
-          <button className="primary" onClick={() => setAdding(true)}>컴퓨터 추가</button>
-          {!DEMO && <button className="link" onClick={logout}>로그아웃</button>}
-        </div>
-      </header>
-      <main>
-        {error && !data && <p className="err">데이터를 불러오지 못했습니다: {error}</p>}
-        {data &&
-          (hostId == null && hosts.length !== 1 ? (
-            <Overview hosts={hosts} now={now} colors={colors} range={range} onRange={setRange} onAdd={() => setAdding(true)} />
-          ) : (
-            <HostDetail
-              host={host}
-              showBack={hosts.length > 1}
-              color={colors.get(host?.id ?? "") ?? "var(--series-1)"}
-              now={now}
-              range={range}
-              onRange={setRange}
-              onDeleted={() => navigate("#/")}
-            />
-          ))}
-      </main>
+    <div className="shell">
+      <Sidebar route={page} email={user.email} onAdd={() => setAdding(true)} onLogout={logout} />
+      <div className="main-col">
+        {DEMO && <DemoBar mode={mode} onMode={switchMode} />}
+        <header className="topbar">
+          {title}
+          <div className="grow" />
+          {page !== "nodes" && (
+            <>
+              <button className={`btn live${paused ? " paused" : ""}`} onClick={() => setPaused((p) => !p)} aria-pressed={paused} title={paused ? "실시간 갱신 재개" : "실시간 갱신 일시정지"}>
+                <span className="dot" aria-hidden="true" />
+                {paused ? "일시정지됨" : "실시간"}
+              </button>
+              <RangeMenu value={range} onChange={setRange} />
+            </>
+          )}
+        </header>
+        <main className="content">
+          {error && !data && <p className="err">데이터를 불러오지 못했습니다: {error}</p>}
+          {data &&
+            (page === "overview" ? (
+              <Overview hosts={hosts} now={now} colors={colors} range={range} paused={paused} onAdd={() => setAdding(true)} />
+            ) : page === "nodes" ? (
+              <Nodes hosts={hosts} now={now} colors={colors} />
+            ) : (
+              <HostDetail host={host} color={colors.get(host?.id ?? "") ?? "var(--series-1)"} now={now} range={range} paused={paused} onDeleted={() => navigate("#/nodes")} />
+            ))}
+        </main>
+      </div>
       {adding && <AddHost onClose={closeAdd} />}
     </div>
   );

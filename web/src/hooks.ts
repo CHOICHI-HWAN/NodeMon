@@ -35,16 +35,16 @@ export function usePoll<T>(fn: () => Promise<T>, deps: unknown[], ms = 10000) {
     };
     setLoading(true);
     run();
-    const t = setInterval(run, ms);
+    const t = ms > 0 ? setInterval(run, ms) : undefined; // ms = 0 means paused: fetch once, then stay still
     const onVisible = () => !document.hidden && run();
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       stop = true;
-      clearInterval(t);
+      if (t) clearInterval(t);
       document.removeEventListener("visibilitychange", onVisible);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+  }, [...deps, ms]);
   return { data, error, loading };
 }
 
