@@ -66,6 +66,8 @@ await ok("device writes latest", db(dev, "PUT", `latest/${dev.uid}`, { ...sample
 await denied("negative values rejected", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, cpu: -1, ts: now }));
 await denied("unknown fields rejected", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, junk: 1 }));
 await denied("non-numeric values rejected", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, cpu: "x", ts: now }));
+await ok("latest may carry the upload interval", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, iv: 180 }));
+await denied("a non-numeric upload interval is rejected", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, iv: "x" }));
 await ok("device writes a minute bucket", db(dev, "PUT", `m/${dev.uid}/20261029/1793280000`, { ...sample, t: 1793280000 }));
 await ok("device writes an hour bucket", db(dev, "PUT", `h/${dev.uid}/202610/1793278800`, { ...sample, t: 1793278800 }));
 await denied("malformed day key rejected", db(dev, "PUT", `m/${dev.uid}/today/1793280000`, { ...sample, t: 1793280000 }));

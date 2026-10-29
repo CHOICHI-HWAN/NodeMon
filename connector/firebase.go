@@ -313,7 +313,8 @@ func (s *fbSink) flush(now time.Time) error {
 		update[k] = v
 	}
 	// ".sv" asks the database for its own clock, so online detection ignores this computer's clock.
-	update["latest/"+s.f.cfg.UID] = record(s.last, map[string]any{"ts": map[string]string{".sv": "timestamp"}})
+	// "iv" tells the dashboard how often to expect an upload, so it can tell "quiet" from "offline".
+	update["latest/"+s.f.cfg.UID] = record(s.last, map[string]any{"ts": map[string]string{".sv": "timestamp"}, "iv": int(s.uploadEvery.Seconds())})
 	if err := s.send(update); err != nil {
 		s.fails++
 		if len(s.queue) > maxQueued {

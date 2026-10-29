@@ -170,14 +170,15 @@ export const firebaseApi: Api = {
     const nowSec = Math.floor(nowMs / 1000);
     const hosts: Host[] = await Promise.all(
       Object.entries(idx).map(async ([id, d]) => {
-        const latest = (await get(ref(db, `latest/${id}`))).val() as (Record<string, number> & { ts: number }) | null;
+        const latest = (await get(ref(db, `latest/${id}`))).val() as (Record<string, number> & { ts: number; iv?: number }) | null;
         const lastSeen = latest ? Math.floor(latest.ts / 1000) : 0;
+        const graceMs = Math.max(90_000, (latest?.iv ?? 60) * 2.5 * 1000);
         return {
           id,
           created_at: d.createdAt ?? 0,
           name: d.name,
           os: d.os,
-          online: latest != null && nowMs - latest.ts < 60_000,
+          online: latest != null && nowMs - latest.ts < graceMs,
           last_seen: lastSeen,
           latest: latest ? toSample(latest) : null,
           cpu_spark: await spark(id, nowSec),

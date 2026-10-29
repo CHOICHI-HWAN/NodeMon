@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AddHost } from "./AddHost";
 import { api, OVERVIEW_POLL_MS, Unauthorized, type RangeKey, type User } from "./api";
 import { demoState, type DemoMode } from "./demo";
@@ -32,9 +32,21 @@ function Dashboard({ user }: { user: User }) {
   const [range, setRange] = useState<RangeKey>("1h");
   const [paused, setPaused] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [watching, setWatching] = useState(false); // just opened "add computer": expect a new node soon
+  const watchTimer = useRef<number>();
   const [mode, setMode] = useState<DemoMode>(demoState.mode);
-  const { data, error } = usePoll(() => api.overview(), [mode], paused ? 0 : OVERVIEW_POLL_MS);
+  const [hostCount, setHostCount] = useState(-1);
+  // Normal polling is slow to save data; right after adding a computer (or with none yet) check often.
+  const fast = watching || hostCount === 0;
+  const { data, error } = usePoll(() => api.overview(), [mode], paused ? 0 : fast ? 5000 : OVERVIEW_POLL_MS);
   const hosts = data?.hosts ?? [];
+  useEffect(() => setHostCount(data ? data.hosts.length : -1), [data]);
+  const openAdd = () => {
+    setAdding(true);
+    setWatching(true);
+    window.clearTimeout(watchTimer.current);
+    watchTimer.current = window.setTimeout(() => setWatching(false), 3 * 60_000);
+  };
   const now = data?.now ?? Math.floor(Date.now() / 1000);
   const colors = useMemo(() => hostColors(hosts), [hosts]);
   const closeAdd = useCallback(() => setAdding(false), []);
@@ -79,7 +91,7 @@ function Dashboard({ user }: { user: User }) {
 
   return (
     <div className="shell">
-      <Sidebar route={page} email={user.email} onAdd={() => setAdding(true)} onLogout={logout} />
+      <Sidebar route={page} email={user.email} onAdd={openAdd} onLogout={logout} />
       <div className="main-col">
         {DEMO && <DemoBar mode={mode} onMode={switchMode} />}
         <header className="topbar">
@@ -99,7 +111,7 @@ function Dashboard({ user }: { user: User }) {
           {error && !data && <p className="err">데이터를 불러오지 못했습니다: {error}</p>}
           {data &&
             (page === "overview" ? (
-              <Overview hosts={hosts} now={now} colors={colors} range={range} paused={paused} onAdd={() => setAdding(true)} />
+              <Overview hosts={hosts} now={now} colors={colors} range={range} paused={paused} onAdd={openAdd} />
             ) : page === "nodes" ? (
               <Nodes hosts={hosts} now={now} colors={colors} />
             ) : (

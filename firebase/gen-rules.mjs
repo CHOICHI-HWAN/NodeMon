@@ -103,6 +103,7 @@ export function buildRules(emails) {
           ".write": writeRule,
           ".validate": `newData.hasChildren(['ts', ${FIELDS.map((f) => `'${f}'`).join(", ")}])`,
           ts: { ".validate": "newData.isNumber()" },
+          iv: { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 86400" },
           ...Object.fromEntries(FIELDS.map((f) => [f, num])),
           $other: { ".validate": false },
         },

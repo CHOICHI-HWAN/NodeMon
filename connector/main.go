@@ -133,7 +133,7 @@ func main() {
 		name      = flag.String("name", hostname, "display name for this computer")
 		netdata   = flag.String("netdata", "http://127.0.0.1:19999", "local Netdata agent URL")
 		interval  = flag.Duration("interval", 10*time.Second, "how often to measure (server backend: also how often to send)")
-		upload    = flag.Duration("upload-every", time.Minute, "Firebase backend: how often to upload; measurements in between are averaged locally")
+		upload    = flag.Duration("upload-every", 3*time.Minute, "Firebase backend: how often to upload; measurements in between are averaged locally")
 		cfgPath   = flag.String("config", defaultConfigPath(), "path of the saved credentials")
 	)
 	flag.Parse()
