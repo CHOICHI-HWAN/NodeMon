@@ -5,6 +5,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"strings"
@@ -18,22 +19,13 @@ type ndChart struct {
 	} `json:"dimensions"`
 }
 
-type sample struct {
-	CPU       float64 `json:"cpu"`
-	MemUsed   float64 `json:"mem_used"`
-	MemTotal  float64 `json:"mem_total"`
-	DiskUsed  float64 `json:"disk_used"`
-	DiskTotal float64 `json:"disk_total"`
-	NetRx     float64 `json:"net_rx"`
-	NetTx     float64 `json:"net_tx"`
-	Load1     float64 `json:"load1"`
-	Uptime    float64 `json:"uptime"` // seconds since the computer booted; not averaged, only the latest is sent
-}
-
 const (
 	mib = 1024 * 1024
 	gib = 1024 * mib
 )
+
+// maxNetdataBody bounds what we read from the agent; a busy host answers with a few MB.
+const maxNetdataBody = 64 << 20
 
 func fetchNetdata(c *http.Client, base string) (map[string]ndChart, error) {
 	resp, err := c.Get(strings.TrimRight(base, "/") + "/api/v1/allmetrics?format=json")
@@ -44,9 +36,45 @@ func fetchNetdata(c *http.Client, base string) (map[string]ndChart, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("netdata returned %s", resp.Status)
 	}
-	var charts map[string]ndChart
-	if err := json.NewDecoder(resp.Body).Decode(&charts); err != nil {
-		return nil, err
+	return readCharts(io.LimitReader(resp.Body, maxNetdataBody))
+}
+
+// wantedChart reports whether toSample reads this chart. Everything else Netdata sends is skipped.
+func wantedChart(id string) bool {
+	switch id {
+	case "system.cpu", "system.ram", "system.net", "system.load", "system.uptime":
+		return true
+	}
+	return strings.HasPrefix(id, "disk_space.")
+}
+
+// readCharts decodes only the charts we use. The agent describes every chart it has (often hundreds, with
+// per-process and per-container detail), and decoding all of them into Go structures every ten seconds
+// costs far more than the handful we need.
+func readCharts(r io.Reader) (map[string]ndChart, error) {
+	dec := json.NewDecoder(r)
+	if t, err := dec.Token(); err != nil || t != json.Delim('{') {
+		return nil, fmt.Errorf("netdata: unexpected response (not a JSON object): %v", err)
+	}
+	charts := map[string]ndChart{}
+	for dec.More() {
+		t, err := dec.Token()
+		if err != nil {
+			return nil, err
+		}
+		id, _ := t.(string)
+		if wantedChart(id) {
+			var c ndChart
+			if err := dec.Decode(&c); err != nil {
+				return nil, err
+			}
+			charts[id] = c
+			continue
+		}
+		var skip json.RawMessage // consumed and dropped without building maps or structs
+		if err := dec.Decode(&skip); err != nil {
+			return nil, err
+		}
 	}
 	return charts, nil
 }

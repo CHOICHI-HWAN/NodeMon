@@ -23,11 +23,17 @@ const TARGETS = [
 const args = process.argv.slice(2);
 const out = path.resolve(root, args.includes("--out") ? args[args.indexOf("--out") + 1] : "dist");
 
-const probe = spawnSync("go", ["version"], { encoding: "utf8", shell: process.platform === "win32" });
+// go and git are real executables, so no shell is needed. (On Windows a shell would also join the arguments without
+// quoting, which breaks the -ldflags value because it contains spaces.)
+const probe = spawnSync("go", ["version"], { encoding: "utf8" });
 if (probe.status !== 0) {
   console.error("Go was not found, so the connector cannot be built here. Install Go 1.24+ from https://go.dev/dl/");
   process.exit(2);
 }
+
+// The version shown by `nodemon-connector --version`: the git tag or commit, or "dev" outside a checkout.
+const described = spawnSync("git", ["describe", "--tags", "--always", "--dirty"], { cwd: root, encoding: "utf8" });
+const version = described.status === 0 ? described.stdout.trim() : "dev";
 
 mkdirSync(out, { recursive: true });
 const sums = [];
@@ -35,10 +41,9 @@ for (const [os, arch] of TARGETS) {
   const name = `nodemon-connector-${os}-${arch}${os === "windows" ? ".exe" : ""}`;
   const file = path.join(out, name);
   // -s -w drops debug tables, about a third smaller; -trimpath keeps build-machine paths out of the binary.
-  const r = spawnSync("go", ["build", "-trimpath", "-ldflags", "-s -w", "-o", file, "."], {
+  const r = spawnSync("go", ["build", "-trimpath", "-ldflags", `-s -w -X main.version=${version}`, "-o", file, "."], {
     cwd: path.join(root, "connector"),
     stdio: ["ignore", "inherit", "inherit"],
-    shell: process.platform === "win32",
     env: { ...process.env, GOOS: os, GOARCH: arch, GOARM: "7", CGO_ENABLED: "0" },
   });
   if (r.status !== 0) {
