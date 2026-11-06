@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 export type Theme = "auto" | "light" | "dark";
 
 export function getTheme(): Theme {

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 export function Sparkline({ values, color }: { values: (number | null)[]; color: string }) {
   const W = 100, H = 28;
   const step = W / Math.max(1, values.length - 1);

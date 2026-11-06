@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Runs the security rules against the Firebase emulators:
 //   ALLOWED_EMAILS=owner@example.com,other@example.com node firebase/gen-rules.mjs
 //   firebase emulators:start --only auth,database --project demo-nodemon   (in another shell)

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 export const pct = (used: number, total: number) => (total > 0 ? (used / total) * 100 : 0);
 
 const UNITS = ["B", "KB", "MB", "GB", "TB"];

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { RANGES, type RangeKey } from "./api";
 import { fmtPct } from "./format";

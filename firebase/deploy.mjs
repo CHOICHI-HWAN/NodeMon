@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: GPL-3.0-or-later
 // One-shot deploy: node firebase/deploy.mjs [--emails a@x.com,b@y.com] [--yes] [--dry-run]
 // Needs only Node.js 18+. Reads firebase/project.config.json (public Firebase identifiers).
 import { existsSync, readFileSync, writeFileSync } from "node:fs";

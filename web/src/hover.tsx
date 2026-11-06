@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 
 // Charts on one page share a hovered timestamp, so the crosshair and legend values line up across them.

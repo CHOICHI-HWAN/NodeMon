@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Cross-compile the connector for every supported OS into ./dist
 set -e
 cd "$(dirname "$0")/connector"

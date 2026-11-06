@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 import { api, pollMs, RANGES, type Host, type RangeKey } from "./api";
 import { DEMO } from "./env";
 import { fmtAgo, fmtBytes, fmtPct, fmtRate, pct } from "./format";

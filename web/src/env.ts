@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Build-time switches (see .env.* files):
 //   VITE_DEMO=1                    fake data, no backend
 //   VITE_BACKEND=firebase          Firebase Auth + Realtime Database (Spark plan, no server)

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 import { useState } from "react";
 import { DEMO } from "./env";
 import { getTheme, setTheme, type Theme } from "./theme";
@@ -61,6 +62,8 @@ export function Sidebar({ route, email, onAdd, onLogout }: Props) {
                 ))}
               </div>
             )}
+            <a className="menu-item" role="menuitem" href="https://github.com/CHOICHI-HWAN/NodeMon" target="_blank" rel="noreferrer">소스 코드 (GPL-3.0)</a>
+            {!DEMO && <a className="menu-item" role="menuitem" href="/third-party-licenses.txt" target="_blank" rel="noreferrer">오픈소스 라이선스</a>}
             {!DEMO && <button className="menu-item" role="menuitem" onClick={onLogout}>로그아웃</button>}
           </div>
         )}

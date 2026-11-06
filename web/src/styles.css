@@ -240,3 +240,6 @@ table.nodes tr.offline td:not(:first-child):not(:nth-child(2)) { opacity: 0.6; }
   .content { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
   .demo-bar { margin-left: max(16px, env(safe-area-inset-left, 0px)); margin-right: max(16px, env(safe-area-inset-right, 0px)); }
 }
+a.menu-item { display: block; border-radius: 6px; color: var(--ink); }
+a.menu-item:hover { background: var(--hover); text-decoration: none; }
+.login-foot { margin: 0; font-size: 12px; color: var(--muted); }

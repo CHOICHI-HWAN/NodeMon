@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 import { useMemo, useState } from "react";
 import type { Host } from "./api";
 import { fmtAgo, fmtPct, fmtRate, pct } from "./format";

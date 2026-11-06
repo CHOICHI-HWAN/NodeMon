@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 import { initializeApp } from "firebase/app";
 import {
   connectAuthEmulator,

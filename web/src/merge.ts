@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 import type { Point } from "./api";
 import type { Series } from "./LineChart";
 

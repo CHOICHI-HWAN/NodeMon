@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 import { api, pollMs, RANGES, type Host, type Point, type RangeKey } from "./api";
 import { fmtBytes, fmtPct, fmtRate, pct } from "./format";
 import { HoverProvider } from "./hover";

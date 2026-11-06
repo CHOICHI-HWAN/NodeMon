@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Builds database.rules.json. Rules cannot read env vars, so the allowed Google
 // accounts are baked in at generation time:  ALLOWED_EMAILS=me@gmail.com node firebase/gen-rules.mjs
 import { writeFileSync } from "node:fs";
