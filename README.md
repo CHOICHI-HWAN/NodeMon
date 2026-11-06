@@ -31,6 +31,13 @@ Spark 요금제에서는 서버 코드(Cloud Functions)를 쓸 수 없으므로 
 [PC] Netdata ← Connector ──(익명 계정, 1회용 코드로 내 계정에 연결)──▶ Realtime Database ◀── 대시보드(Firebase Hosting, Google 로그인)
 ```
 
+### 한 번에 배포 (권장)
+Node.js 18 이상만 있으면 됩니다. 값은 `firebase/project.config.json`에 들어 있습니다(Firebase 공개 식별자). 콘솔 설정(아래 1~3)을 마친 뒤 실행하세요.
+```
+node firebase/deploy.mjs --emails 내계정@gmail.com
+```
+설정 파일 생성, 보안 규칙 생성, 빌드, Firebase 로그인, 배포까지 순서대로 진행하고, 배포 직전에 한 번 확인을 묻습니다. `--dry-run`을 붙이면 로그인·배포만 빼고 모두 실행해서 준비 상태를 점검합니다. `--yes`는 확인을 건너뜁니다. 허용 계정은 한 번 입력하면 기억합니다.
+
 ### 설정
 1. [Firebase 콘솔](https://console.firebase.google.com)에서 프로젝트를 만듭니다. (Spark 요금제 그대로)
 2. **Authentication > 로그인 방법**에서 **Google**과 **익명**을 모두 사용 설정합니다. 익명은 각 PC(Connector)가 자기 신원을 갖는 데 씁니다.

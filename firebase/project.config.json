@@ -1,0 +1,7 @@
+{
+  "projectId": "primervalidator",
+  "site": "comon",
+  "apiKey": "AIzaSyAN4b8FXpGq1X2bGrp7HbBjZbFqpBLFJns",
+  "authDomain": "primervalidator.firebaseapp.com",
+  "databaseURL": "https://primervalidator-default-rtdb.asia-southeast1.firebasedatabase.app"
+}

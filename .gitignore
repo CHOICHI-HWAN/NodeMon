@@ -12,3 +12,4 @@ firebase/database.rules.json
 web/dist-firebase/
 web/.env.*.local
 web/dist-emu/
+firebase/.allowed-emails
