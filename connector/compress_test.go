@@ -14,13 +14,19 @@ import (
 )
 
 // A realistic upload: the latest value plus three finished one-minute buckets, as one multi-path update.
+// The values differ from minute to minute, as real measurements do. Identical values would make every
+// compressor look better than it is (an earlier version of this test did that and reported 74%).
 func sampleUpdate() map[string]any {
-	rec := func(extra map[string]any) map[string]any {
-		return record(sample{CPU: 37.52, Load1: 1.23, MemUsed: 8123456789, MemTotal: 17179869184, DiskUsed: 412345678902, DiskTotal: 1e12, NetRx: 123457, NetTx: 7654}, extra)
+	rec := func(i int, extra map[string]any) map[string]any {
+		f := float64(i)
+		return record(sample{
+			CPU: 37.52 + f*6.13, Load1: 1.23 + f*0.37, MemUsed: 8123456789 + f*1234567, MemTotal: 17179869184,
+			DiskUsed: 412345678902 + f*8191, DiskTotal: 1e12, NetRx: 123457 + f*98765, NetTx: 7654 + f*4321,
+		}, extra)
 	}
-	u := map[string]any{"latest/dev1": rec(map[string]any{"ts": 1, "iv": 180, "ut": 98765, "up": 123456, "down": 7890})}
+	u := map[string]any{"latest/UID123456789012345678901234": rec(3, map[string]any{"ts": 1, "iv": 180, "ut": 98765, "up": 123456, "down": 7890})}
 	for i := 0; i < 3; i++ {
-		u[fmt.Sprintf("m/dev1/20261106/%d", 1793280000+i*60)] = rec(map[string]any{"t": 1793280000 + i*60})
+		u[fmt.Sprintf("m/UID123456789012345678901234/20261106/%d", 1793280000+i*60)] = rec(i, map[string]any{"t": 1793280000 + i*60})
 	}
 	return u
 }
@@ -79,8 +85,8 @@ func TestCompressedUploadsAreSmallerAndIntact(t *testing.T) {
 		t.Fatalf("the server must receive the same data either way: %d vs %d paths", len(packed.decoded[0]), len(plain.decoded[0]))
 	}
 	t.Logf("upload body: %d bytes plain, %d bytes gzipped (%.0f%% smaller)", plain.rawBytes[0], packed.rawBytes[0], 100*(1-float64(packed.rawBytes[0])/float64(plain.rawBytes[0])))
-	if packed.rawBytes[0] > plain.rawBytes[0]/2 {
-		t.Fatalf("gzip should at least halve a body of repeated keys: %d -> %d", plain.rawBytes[0], packed.rawBytes[0])
+	if packed.rawBytes[0] > plain.rawBytes[0]*6/10 {
+		t.Fatalf("gzip should save at least 40%% on a body of repeated keys: %d -> %d", plain.rawBytes[0], packed.rawBytes[0])
 	}
 }
 
