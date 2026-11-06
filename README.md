@@ -44,6 +44,7 @@ Spark 요금제에서는 서버 코드(Cloud Functions)를 쓸 수 없으므로 
    npx firebase-tools login
    npx firebase-tools deploy --only database,hosting
    ```
+   `firebase.json`의 `hosting.site`(기본 `comon`)에 배포됩니다. 다른 사이트 ID를 쓰면 이 값을 바꾸세요. **같은 Firebase 프로젝트에 이미 쓰는 앱이 있다면** `deploy --only database`가 그 앱의 데이터베이스 규칙을 덮어쓰므로, 새 프로젝트를 따로 만드는 것을 권합니다.
    허용 계정을 바꾸려면 `ALLOWED_EMAILS`를 고쳐 다시 생성하고 `deploy --only database` 하면 됩니다.
 6. `https://<프로젝트>.web.app`에 접속해 Google로 로그인하고 **컴퓨터 추가**에서 나오는 명령을 각 PC에서 한 번 실행합니다.
    ```
