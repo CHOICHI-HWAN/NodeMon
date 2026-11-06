@@ -22,6 +22,9 @@
 | 데이터 | Realtime Database | SQLite |
 | 비용 | 0원 (한도 초과 시 과금이 아니라 일시 차단) | 서버 비용 |
 
+## 상표와 라이선스 고지
+NodeMon은 Netdata, Inc.와 제휴하거나 보증받은 프로젝트가 아닙니다. Netdata는 Netdata, Inc.의 상표입니다. 이 프로젝트는 각 PC에서 별도로 실행되는 Netdata 에이전트(GPLv3+)의 로컬 API를 HTTP로 읽을 뿐, Netdata의 코드나 대시보드 UI, 로고를 포함하지 않습니다.
+
 ## Firebase(Spark 무료 요금제)로 쓰기
 
 Spark 요금제에서는 서버 코드(Cloud Functions)를 쓸 수 없으므로 서버 없이 동작하도록 설계했습니다.

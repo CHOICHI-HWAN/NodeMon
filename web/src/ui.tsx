@@ -43,7 +43,7 @@ export function Meter({ label, value, detail }: { label: string; value: number; 
   );
 }
 
-// Section heading that collapses its charts, like the group headers in Netdata's dashboards.
+// Section heading that collapses the charts below it.
 export function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   const [open, setOpen] = useState(true);
   return (
