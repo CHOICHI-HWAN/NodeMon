@@ -1,7 +1,7 @@
 name: Release
 
 # Pushing a tag such as v0.1.0 builds the connector for every supported computer type and publishes
-# one ZIP per type (plus SHA256SUMS) as a GitHub Release. The dashboard's "add computer" window links to these.
+# one ZIP per type (plus SHA256SUMS) as a GitHub Release. The text of the release is the CHANGELOG.md section of that version. The dashboard's "add computer" window links to these.
 on:
   push:
     tags: ["v*"]
@@ -27,6 +27,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Check the version and prepare the release notes
+        env:
+          TAG: ${{ inputs.version || github.ref_name }}
+        run: |
+          case "$TAG" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "Version must look like v1.2.3, got $TAG" >&2; exit 1;; esac
+          # The notes are the CHANGELOG.md section of this version; this fails if the section is missing.
+          node scripts/release-notes.mjs "$TAG" > "$RUNNER_TEMP/notes.md"
+          # Stamp the program with the tag (nodemon-connector --version), also when started by hand.
+          git rev-parse -q --verify "refs/tags/$TAG" >/dev/null || git tag "$TAG"
       - name: Tests
         working-directory: connector
         run: go test ./...
@@ -41,6 +50,5 @@ jobs:
         run: |
           gh release create "$TAG" "$RUNNER_TEMP"/release/* \
             --target "$GITHUB_SHA" \
-            --title "NodeMon connector $TAG" \
-            --generate-notes \
-            --notes "Connector programs for each computer type, as ZIP files (each holds the program, the license and the third-party notices). Verify a download with SHA256SUMS. NodeMon is an independent project, not affiliated with Netdata, Inc."
+            --title "NodeMon $TAG" \
+            --notes-file "$RUNNER_TEMP/notes.md"

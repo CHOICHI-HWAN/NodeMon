@@ -31,7 +31,8 @@
 | [Firebase로 쓰기](docs/firebase.md) | 콘솔 설정, 배포, 업데이트, 처음 시험할 때의 문제 해결 |
 | [Connector 설치](docs/connector.md) | Linux·macOS·Windows별 파일 고르기, 등록, 자동 실행, 가동 시간 |
 | [데이터 구조·전송량·사용량](docs/data-and-usage.md) | 무엇을 저장하나, 한 달 업로드량 계산, 압축, Spark 한도 |
-| [개발](docs/development.md) | 실행, 검사, 구성, 알려진 한계 |
+| [개발](docs/development.md) | 실행, 검사, 버전·릴리스 방법, 구성, 알려진 한계 |
+| [변경 기록](CHANGELOG.md) | 버전별 변경 내용 |
 
 ## 라이선스
 NodeMon은 **GNU General Public License v3.0 이상(GPL-3.0-or-later)** 으로 배포됩니다. 전문은 [LICENSE](LICENSE)에 있습니다.

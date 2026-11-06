@@ -37,6 +37,16 @@ npx firebase-tools emulators:exec --only auth,database --project demo-nodemon \
 | `firebase/` | 보안 규칙 생성기(`gen-rules.mjs`), 규칙 테스트, 한 번에 배포하는 `deploy.mjs` |
 | `scripts/` | 빌드·라이선스 고지·동기화 검사 |
 
+## 버전과 변경 기록
+
+- 버전은 [유의적 버전](https://semver.org/lang/ko/)(`MAJOR.MINOR.PATCH`)을 따르고, 태그는 `v0.1.0` 꼴입니다. 1.0 전에는 호환이 깨지는 변경도 MINOR를 올립니다.
+- 변경은 작업하면서 `CHANGELOG.md`의 `[Unreleased]`에 바로 적습니다(Added / Changed / Fixed / Removed / Security). 사용자가 알아야 할 것만 적고, 내부 정리는 적지 않습니다.
+- 릴리스하는 법:
+  1. `CHANGELOG.md`에서 `[Unreleased]`의 내용을 `## [X.Y.Z] - 날짜` 아래로 옮기고, 맨 아래 비교 링크를 갱신합니다.
+  2. `main`에 반영한 뒤 `git tag -a vX.Y.Z -m "NodeMon vX.Y.Z" && git push origin vX.Y.Z`. 태그를 올릴 수 없는 환경이면 GitHub의 Actions → Release → Run workflow에서 `vX.Y.Z`를 입력합니다(태그는 워크플로가 만듭니다).
+  3. 워크플로가 모든 종류를 빌드해 ZIP과 `SHA256SUMS`를 릴리스에 올리고, 릴리스 본문은 `CHANGELOG.md`의 해당 버전 부분이 됩니다. 그 버전의 내용이 없으면 실패합니다(`node scripts/release-notes.mjs vX.Y.Z`로 미리 볼 수 있습니다).
+- `nodemon-connector --version`은 태그(또는 커밋)를 보여줍니다. 이미 올린 태그는 옮기거나 지우지 않고, 문제가 있으면 새 PATCH 버전을 냅니다.
+
 ## 알려진 한계
 
 - Firebase 방식의 상세 차트는 1분 평균이 최소 단위입니다(최신 값은 차트 끝에 이어 붙임). 분 평균은 2일, 시간 평균은 100일 보관합니다. 알림·팀 공유는 아직 없습니다.

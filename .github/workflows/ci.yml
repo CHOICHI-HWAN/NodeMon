@@ -67,6 +67,11 @@ jobs:
         run: |
           for f in firebase/*.mjs scripts/*.mjs; do node --check "$f"; done
           sh -n build-connector.sh
+      - name: Changelog has an Unreleased section and release notes can be extracted
+        run: |
+          grep -q '^## \[Unreleased\]' CHANGELOG.md
+          latest=$(grep -m1 -o '^## \[[0-9][^]]*\]' CHANGELOG.md | tr -d '#[] ')
+          node scripts/release-notes.mjs "v$latest" > /dev/null
       - name: Build targets agree in the shell script, the node script and the dialog
         run: node scripts/check-targets.mjs
       - name: Third-party notices are up to date
