@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  connector:
+    name: Connector (Go)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: connector/go.mod
+          cache-dependency-path: connector/go.mod
+      - name: Formatting
+        working-directory: connector
+        run: test -z "$(gofmt -l .)"
+      - name: Vet and static analysis
+        working-directory: connector
+        run: |
+          go vet ./...
+          go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 ./...
+      - name: Tests (with the race detector)
+        working-directory: connector
+        run: go test -race ./...
+      - name: Cross-compile every supported computer type
+        run: node scripts/build-connector.mjs --out "$RUNNER_TEMP/dist"
+
+  server:
+    name: Self-hosted server (Go)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - working-directory: server
+        run: |
+          test -z "$(gofmt -l .)"
+          go vet ./...
+          go build ./...
+
+  web:
+    name: Dashboard (TypeScript)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - working-directory: web
+        run: |
+          npm ci
+          npx tsc --noEmit
+          npm run build
+          npm run build:demo
+          npx --yes knip@5 --no-progress
+
+  repository:
+    name: Repository consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Scripts parse
+        run: |
+          for f in firebase/*.mjs scripts/*.mjs; do node --check "$f"; done
+          sh -n build-connector.sh
+      - name: Build targets agree in the shell script, the node script and the dialog
+        run: node scripts/check-targets.mjs
+      - name: Third-party notices are up to date
+        run: |
+          npm ci --prefix web
+          node scripts/third-party-notices.mjs
+          git diff --exit-code THIRD_PARTY_LICENSES.md web/public/third-party-licenses.txt
+
+  firebase-rules:
+    name: Security rules and enrolment (Firebase emulator)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: connector/go.mod
+          cache-dependency-path: connector/go.mod
+      - run: npm install --global firebase-tools@13.35.1
+      - run: ALLOWED_EMAILS=owner@example.com,other@example.com node firebase/gen-rules.mjs
+      - name: Rules suite and the connector's emulator tests
+        run: >
+          firebase emulators:exec --only auth,database --project demo-nodemon
+          "node firebase/rules.test.mjs && cd connector && NM_FIREBASE_EMULATOR=1 go test ./..."
