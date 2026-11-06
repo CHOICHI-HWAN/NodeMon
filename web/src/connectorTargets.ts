@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Which connector file belongs to which computer, and the commands to run it.
-// File names match what build-connector.sh writes into dist/.
+// File names match what build-connector.sh writes into dist/; the ZIP files of a GitHub Release hold the same programs.
 
 export type Os = "linux" | "darwin" | "windows";
 export type Arch = "amd64" | "arm64" | "arm";
-export type Build = "download" | "dist" | "local"; // download from the dashboard, copy a file from dist/, or build on this very computer
+export type Build = "download" | "dist" | "local"; // download the release ZIP, copy a file from dist/, or build on this very computer
 
 export const OS_LABEL: Record<Os, string> = { linux: "Linux", darwin: "macOS", windows: "Windows" };
 
@@ -37,12 +37,21 @@ export function runCommand(os: Os, file: string, args: string): string {
   return os === "windows" ? `.\\${file} ${args}` : `chmod +x ./${file} && ./${file} ${args}`;
 }
 
-export const downloadUrl = (origin: string, file: string) => `${origin}/downloads/${file}`;
+export const REPO_URL = "https://github.com/CHOICHI-HWAN/NodeMon";
+export const RELEASES_URL = `${REPO_URL}/releases`;
+
+// "latest" always points to the newest release, so these links never need to change.
+export const zipName = (os: Os, arch: Arch) => `nodemon-connector-${os}-${arch}.zip`;
+export const downloadUrl = (name: string) => `${RELEASES_URL}/latest/download/${name}`;
 
 // Fetching from the terminal of the target computer is the simplest path; curl also avoids macOS's download quarantine.
-export function downloadCommand(os: Os, origin: string, file: string): string {
-  const url = downloadUrl(origin, file);
-  return os === "windows" ? `Invoke-WebRequest ${url} -OutFile ${file}` : `curl -fLO ${url}`;
+// The ZIP holds the program under the name `file`, so the commands that follow work unchanged.
+export function downloadCommand(os: Os, arch: Arch): string {
+  const zip = zipName(os, arch);
+  const url = downloadUrl(zip);
+  return os === "windows"
+    ? `Invoke-WebRequest ${url} -OutFile ${zip}; Expand-Archive ${zip} -DestinationPath . -Force`
+    : `curl -fLO ${url} && unzip -o ${zip}`;
 }
 
 export const BUILD_LOCAL = "cd connector && go build -o nodemon-connector . && cd ..";

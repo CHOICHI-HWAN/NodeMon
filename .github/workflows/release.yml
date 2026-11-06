@@ -1,0 +1,39 @@
+name: Release
+
+# Pushing a tag such as v0.1.0 builds the connector for every supported computer type and publishes
+# one ZIP per type (plus SHA256SUMS) as a GitHub Release. The dashboard's "add computer" window links to these.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: connector/go.mod
+          cache-dependency-path: connector/go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Tests
+        working-directory: connector
+        run: go test ./...
+      - name: Build every computer type
+        run: node scripts/build-connector.mjs --out "$RUNNER_TEMP/dist"
+      - name: Pack one ZIP per computer type
+        run: node scripts/package-release.mjs --in "$RUNNER_TEMP/dist" --out "$RUNNER_TEMP/release"
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP"/release/* \
+            --title "NodeMon connector $GITHUB_REF_NAME" \
+            --generate-notes \
+            --notes "Connector programs for each computer type, as ZIP files (each holds the program, the license and the third-party notices). Verify a download with SHA256SUMS. NodeMon is an independent project, not affiliated with Netdata, Inc."
