@@ -96,7 +96,7 @@ func TestEmulatorEnrollAndRollup(t *testing.T) {
 
 	// Drive the sink with a fake clock so minute/hour boundaries and token refresh are exercised.
 	usage := newUsageCounter(0, 0)
-	fc := newFBClient(newCountingClient(usage), saved)
+	fc := newFBClient(newCountingClient(usage, time.Minute), saved)
 	base := time.Now().UTC().Truncate(time.Hour).Add(-3 * time.Hour)
 	clock := base.Add(10 * time.Minute)
 	fc.now = func() time.Time { return clock }
@@ -325,7 +325,7 @@ func TestCountingClientCountsSocketBytes(t *testing.T) {
 	defer srv.Close()
 	u := newUsageCounter(0, 0)
 	body := strings.NewReader(strings.Repeat("x", 3000))
-	resp, err := newCountingClient(u).Post(srv.URL, "text/plain", body)
+	resp, err := newCountingClient(u, time.Minute).Post(srv.URL, "text/plain", body)
 	if err != nil {
 		t.Fatal(err)
 	}

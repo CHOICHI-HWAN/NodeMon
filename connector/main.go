@@ -145,6 +145,7 @@ func main() {
 		name      = flag.String("name", hostname, "display name for this computer")
 		netdata   = flag.String("netdata", "http://127.0.0.1:19999", "local Netdata agent URL")
 		interval  = flag.Duration("interval", 10*time.Second, "how often to measure (server backend: also how often to send)")
+		compress  = flag.Bool("compress", false, "Firebase backend, experimental: gzip upload bodies; falls back to plain if the database refuses them")
 		upload    = flag.Duration("upload-every", 3*time.Minute, "Firebase backend: how often to upload; measurements in between are averaged locally")
 		cfgPath   = flag.String("config", defaultConfigPath(), "path of the saved credentials")
 	)
@@ -166,7 +167,7 @@ func main() {
 				log.Fatal("--firebase-api-key is required together with --firebase-db-url")
 			}
 			var saved *fbSaved
-			saved, err = enrollFirebase(newCountingClient(usage), fbSaved{APIKey: *fbKey, DatabaseURL: *fbDB, AuthURL: *fbAuthURL, TokenURL: *fbTokURL}, *code, *name, runtime.GOOS)
+			saved, err = enrollFirebase(newCountingClient(usage, 5*time.Minute), fbSaved{APIKey: *fbKey, DatabaseURL: *fbDB, AuthURL: *fbAuthURL, TokenURL: *fbTokURL}, *code, *name, runtime.GOOS)
 			up, down := usage.snapshot()
 			cfg = config{Backend: "firebase", Firebase: saved, Usage: &usageSaved{Up: up, Down: down}}
 		case *server != "":
@@ -191,7 +192,13 @@ func main() {
 	var persist func(force bool)
 	switch cfg.backend() {
 	case "firebase":
-		fc := newFBClient(newCountingClient(usage), cfg.Firebase)
+		// Keep the connection open between uploads (at least 5 minutes, or twice the upload interval).
+		idle := 2 * *upload
+		if idle < 5*time.Minute {
+			idle = 5 * time.Minute
+		}
+		fc := newFBClient(newCountingClient(usage, idle), cfg.Firebase)
+		fc.compress = *compress
 		fs := newFBSink(fc, *upload)
 		fs.usage = usage
 		out = fs

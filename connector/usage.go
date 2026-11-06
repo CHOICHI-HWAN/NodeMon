@@ -43,8 +43,15 @@ func (c *countConn) Write(b []byte) (int, error) {
 }
 
 // newCountingClient returns an HTTP client whose every connection feeds the counter.
-func newCountingClient(u *usageCounter) *http.Client {
-	d := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
+// idle is how long an unused connection is kept. It must be longer than the gap between uploads: a new
+// connection costs a TLS handshake (about 2.4 KB) and full-size request headers, while a reused HTTP/2
+// connection sends the repeated headers as a few bytes.
+func newCountingClient(u *usageCounter, idle time.Duration) *http.Client {
+	d := &net.Dialer{
+		Timeout: 10 * time.Second,
+		// Probe rarely: each probe is a packet on the wire, and a connection that stays open is the point.
+		KeepAliveConfig: net.KeepAliveConfig{Enable: true, Idle: 2 * time.Minute, Interval: 2 * time.Minute, Count: 3},
+	}
 	tr := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -56,7 +63,7 @@ func newCountingClient(u *usageCounter) *http.Client {
 		},
 		ForceAttemptHTTP2:     true, // a custom dialer would otherwise turn HTTP/2 off
 		MaxIdleConns:          4,
-		IdleConnTimeout:       90 * time.Second,
+		IdleConnTimeout:       idle,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: time.Second,
 	}

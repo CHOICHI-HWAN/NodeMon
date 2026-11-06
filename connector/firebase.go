@@ -4,10 +4,12 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"net/http"
 	"net/url"
@@ -41,6 +43,17 @@ type fbClient struct {
 	idToken string
 	expiry  time.Time
 	now     func() time.Time
+	// compress sends request bodies gzipped. It is opt-in because Realtime Database does not document support
+	// for it: the first upload the server rejects switches it off for good and the same data is resent plain.
+	compress bool
+}
+
+func gzipBytes(b []byte) []byte {
+	var buf bytes.Buffer
+	w, _ := gzip.NewWriterLevel(&buf, gzip.BestCompression)
+	w.Write(b)
+	w.Close()
+	return buf.Bytes()
 }
 
 func newFBClient(c *http.Client, cfg *fbSaved) *fbClient {
@@ -154,11 +167,19 @@ func (f *fbClient) db(method, path string, body any, extra url.Values) ([]byte, 
 			return nil, err
 		}
 		var rd io.Reader
+		encoded := false
 		if body != nil {
 			b, _ := json.Marshal(body)
+			if f.compress && method != http.MethodGet {
+				b, encoded = gzipBytes(b), true
+			}
 			rd = bytes.NewReader(b)
 		}
 		req, _ := http.NewRequest(method, u, rd)
+		if encoded {
+			req.Header.Set("Content-Encoding", "gzip")
+			req.Header.Set("Content-Type", "application/json")
+		}
 		resp, err := f.http.Do(req)
 		if err != nil {
 			return nil, err
@@ -168,6 +189,11 @@ func (f *fbClient) db(method, path string, body any, extra url.Values) ([]byte, 
 		switch {
 		case resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent:
 			return b, nil
+		case encoded && (resp.StatusCode == http.StatusBadRequest || resp.StatusCode == http.StatusUnsupportedMediaType):
+			// The server did not understand the compressed body. Stop compressing and resend the same data plain.
+			f.compress = false
+			log.Printf("the database does not accept compressed uploads; sending them uncompressed from now on")
+			return f.db(method, path, body, extra)
 		case resp.StatusCode == http.StatusUnauthorized && attempt == 0:
 			f.idToken = "" // force a fresh token, then retry once
 		case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
