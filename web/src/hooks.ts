@@ -44,7 +44,7 @@ export function usePoll<T>(fn: () => Promise<T>, deps: unknown[], ms = 10000) {
       if (t) clearInterval(t);
       document.removeEventListener("visibilitychange", onVisible);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // `fn` is read fresh on every run; restarting the timer is driven only by the explicit deps (and the interval).
   }, [...deps, ms]);
   return { data, error, loading };
 }

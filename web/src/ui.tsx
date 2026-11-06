@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { RANGES, type RangeKey } from "./api";
-import { fmtPct } from "./format";
 
 export function Status({ online }: { online: boolean }) {
   return (
@@ -30,19 +29,6 @@ export function Tile({ label, value, sub, bar, hint }: { label: string; value: R
       <div className="tile-value">{value}</div>
       {bar != null && <Bar value={bar} label={label} />}
       {sub && <div className="tile-sub">{sub}</div>}
-    </div>
-  );
-}
-
-export function Meter({ label, value, detail }: { label: string; value: number; detail: string }) {
-  return (
-    <div className="meter">
-      <div className="meter-row">
-        <span>{label}</span>
-        <strong>{fmtPct(value)}</strong>
-      </div>
-      <Bar value={value} label={label} />
-      <div className="meter-detail">{detail}</div>
     </div>
   );
 }

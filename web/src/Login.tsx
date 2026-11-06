@@ -3,7 +3,7 @@ import { useState } from "react";
 import { api } from "./api";
 import { BACKEND } from "./env";
 
-export function Login({ onLogin }: { onLogin: () => void }) {
+export function Login({ onLogin, startupError }: { onLogin: () => void; startupError?: string | null }) {
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState("owner@example.com");
 
@@ -34,7 +34,7 @@ export function Login({ onLogin }: { onLogin: () => void }) {
             <button className="link" onClick={() => run(() => api.emulatorLogin!(email))}>이 계정으로 로그인</button>
           </div>
         )}
-        {error && <p className="err">{error}</p>}
+        {(error ?? startupError) && <p className="err">{error ?? startupError}</p>}
         <p className="login-foot">NodeMon은 Netdata, Inc.와 무관한 독립 프로젝트입니다. Netdata는 Netdata, Inc.의 상표입니다.</p>
         <p className="login-foot">
           GPL-3.0-or-later · <a href="https://github.com/CHOICHI-HWAN/NodeMon" target="_blank" rel="noreferrer">소스 코드</a> ·{" "}

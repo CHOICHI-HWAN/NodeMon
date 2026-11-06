@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { initializeApp } from "firebase/app";
 import {
+  type Auth,
   connectAuthEmulator,
   getAuth,
   GoogleAuthProvider,
@@ -11,6 +12,7 @@ import {
   type User as FbUser,
 } from "firebase/auth";
 import {
+  type Database,
   connectDatabaseEmulator,
   get,
   getDatabase,
@@ -24,33 +26,51 @@ import {
 } from "firebase/database";
 import { RANGES, unauthorized, type Api, type Host, type Point, type Sample } from "./api";
 
-// Reads one value from a Vite env var; a missing one is a build-configuration mistake worth naming.
+// Reads one value from a Vite env var.
 const env = (k: string): string => (import.meta.env[k] as string | undefined) ?? "";
 
+const SETTINGS = {
+  apiKey: "VITE_FIREBASE_API_KEY",
+  authDomain: "VITE_FIREBASE_AUTH_DOMAIN",
+  databaseURL: "VITE_FIREBASE_DATABASE_URL",
+  projectId: "VITE_FIREBASE_PROJECT_ID",
+} as const;
 const config = {
-  apiKey: env("VITE_FIREBASE_API_KEY"),
-  authDomain: env("VITE_FIREBASE_AUTH_DOMAIN"),
-  databaseURL: env("VITE_FIREBASE_DATABASE_URL"),
-  projectId: env("VITE_FIREBASE_PROJECT_ID"),
+  apiKey: env(SETTINGS.apiKey),
+  authDomain: env(SETTINGS.authDomain),
+  databaseURL: env(SETTINGS.databaseURL),
+  projectId: env(SETTINGS.projectId),
 };
 const EMULATOR = env("VITE_FIREBASE_EMULATOR") === "1";
 
-const app = initializeApp(config);
-const auth = getAuth(app);
-const db = getDatabase(app);
-if (EMULATOR) {
-  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
-  connectDatabaseEmulator(db, "127.0.0.1", 9000);
-}
-
-// The database clock decides "online"; the browser's own clock may be off.
+// The server's clock decides "online"; the browser's own clock may be off.
 let skew = 0;
-onValue(ref(db, ".info/serverTimeOffset"), (s) => (skew = (s.val() as number) ?? 0));
 const serverNowMs = () => Date.now() + skew;
+
+let started: { auth: Auth; db: Database } | null = null;
+
+// Starting is deferred to the first use so that a missing setting becomes a readable message on screen.
+// Without this the SDK throws an obscure error while the page is still loading, and the user just sees a login page.
+function fb() {
+  if (started) return started;
+  const missing = (Object.keys(SETTINGS) as (keyof typeof SETTINGS)[]).filter((k) => !config[k]).map((k) => SETTINGS[k]);
+  if (missing.length) {
+    throw new Error(`Firebase 설정이 비어 있습니다: ${missing.join(", ")}. web/.env.firebase.local 을 확인하고 다시 빌드·배포하세요.`);
+  }
+  const app = initializeApp(config);
+  const auth = getAuth(app);
+  const db = getDatabase(app);
+  if (EMULATOR) {
+    connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+    connectDatabaseEmulator(db, "127.0.0.1", 9000);
+  }
+  onValue(ref(db, ".info/serverTimeOffset"), (s) => (skew = (s.val() as number) ?? 0));
+  return (started = { auth, db });
+}
 
 function firstAuthState(): Promise<FbUser | null> {
   return new Promise((resolve) => {
-    const off = onAuthStateChanged(auth, (u) => {
+    const off = onAuthStateChanged(fb().auth, (u) => {
       off();
       resolve(u);
     });
@@ -58,7 +78,7 @@ function firstAuthState(): Promise<FbUser | null> {
 }
 
 function requireUser(): FbUser {
-  return auth.currentUser ?? unauthorized();
+  return fb().auth.currentUser ?? unauthorized();
 }
 
 const FIELDS = ["cpu", "mem_used", "mem_total", "disk_used", "disk_total", "net_rx", "net_tx", "load1"] as const;
@@ -86,7 +106,7 @@ async function readBuckets(kind: "m" | "h", id: string, from: number, to: number
       if (++m === 12) { m = 0; y++; }
     }
   }
-  const snaps = await Promise.all(keys.map((k) => get(query(ref(db, `${kind}/${id}/${k}`), orderByKey(), startAt(String(from))))));
+  const snaps = await Promise.all(keys.map((k) => get(query(ref(fb().db, `${kind}/${id}/${k}`), orderByKey(), startAt(String(from))))));
   const out: Point[] = [];
   for (const s of snaps) s.forEach((c) => { out.push({ ...toSample(c.val()), t: c.val().t, up: c.val().up, down: c.val().down }); });
   return out.sort((a, b) => a.t - b.t);
@@ -167,31 +187,31 @@ const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 export const firebaseApi: Api = {
   async me() {
-    const u = auth.currentUser ?? (await firstAuthState());
+    const u = fb().auth.currentUser ?? (await firstAuthState());
     if (!u || u.isAnonymous) unauthorized();
     return { id: 0, email: u.email ?? "", name: u.displayName ?? u.email ?? "" };
   },
 
   async login() {
-    await signInWithPopup(auth, new GoogleAuthProvider());
+    await signInWithPopup(fb().auth, new GoogleAuthProvider());
   },
 
   // Only exists so the UI can be exercised against the local emulator without a real Google popup.
   emulatorLogin: EMULATOR
     ? async (email: string) => {
         const idToken = JSON.stringify({ sub: email, email, email_verified: true });
-        await signInWithCredential(auth, GoogleAuthProvider.credential(idToken));
+        await signInWithCredential(fb().auth, GoogleAuthProvider.credential(idToken));
       }
     : undefined,
 
   async overview() {
     const u = requireUser();
-    const idx = ((await get(ref(db, `users/${u.uid}/devices`))).val() ?? {}) as Record<string, { name: string; os: string; createdAt?: number }>;
+    const idx = ((await get(ref(fb().db, `users/${u.uid}/devices`))).val() ?? {}) as Record<string, { name: string; os: string; createdAt?: number }>;
     const nowMs = serverNowMs();
     const nowSec = Math.floor(nowMs / 1000);
     const hosts: Host[] = await Promise.all(
       Object.entries(idx).map(async ([id, d]) => {
-        const latest = (await get(ref(db, `latest/${id}`))).val() as (Record<string, number> & { ts: number; iv?: number; up?: number; down?: number; ut?: number }) | null;
+        const latest = (await get(ref(fb().db, `latest/${id}`))).val() as (Record<string, number> & { ts: number; iv?: number; up?: number; down?: number; ut?: number }) | null;
         const lastSeen = latest ? Math.floor(latest.ts / 1000) : 0;
         const graceMs = Math.max(90_000, (latest?.iv ?? 60) * 2.5 * 1000);
         return {
@@ -221,7 +241,7 @@ export const firebaseApi: Api = {
     const long = sec > 24 * 3600; // week/month views read hourly averages instead of minute ones
     const pts = [...(await readCached(long ? "h" : "m", id, from, to))]; // copy: the cache must not gain the live point below
     // Extend the chart to "now" with the live value, which is ahead of the last finished minute.
-    const latest = (await get(ref(db, `latest/${id}`))).val() as (Record<string, number> & { ts: number }) | null;
+    const latest = (await get(ref(fb().db, `latest/${id}`))).val() as (Record<string, number> & { ts: number }) | null;
     if (latest && Math.floor(latest.ts / 1000) > (pts[pts.length - 1]?.t ?? 0) && Math.floor(latest.ts / 1000) >= from) {
       pts.push({ ...toSample(latest), t: Math.floor(latest.ts / 1000) });
     }
@@ -233,7 +253,7 @@ export const firebaseApi: Api = {
     const u = requireUser();
     // The device record goes last: the rules use it to decide that you own the other nodes.
     for (const path of [`users/${u.uid}/devices/${id}`, `latest/${id}`, `m/${id}`, `h/${id}`, `devices/${id}`]) {
-      await remove(ref(db, path));
+      await remove(ref(fb().db, path));
     }
   },
 
@@ -242,7 +262,7 @@ export const firebaseApi: Api = {
     const raw = crypto.getRandomValues(new Uint8Array(12));
     const code = Array.from(raw, (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join("");
     const expMs = Math.floor(serverNowMs()) + 15 * 60_000;
-    await set(ref(db, `pairings/${code}`), { owner: u.uid, exp: expMs });
+    await set(ref(fb().db, `pairings/${code}`), { owner: u.uid, exp: expMs });
     const shown = `${code.slice(0, 4)}-${code.slice(4, 8)}-${code.slice(8)}`;
     return {
       code: shown,
@@ -252,6 +272,6 @@ export const firebaseApi: Api = {
   },
 
   async logout() {
-    await signOut(auth);
+    await signOut(fb().auth);
   },
 };

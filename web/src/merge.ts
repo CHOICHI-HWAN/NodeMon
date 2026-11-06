@@ -2,7 +2,7 @@
 import type { Point } from "./api";
 import type { Series } from "./LineChart";
 
-export type HostRef = { id: string; name: string; color: string };
+type HostRef = { id: string; name: string; color: string };
 
 // Server buckets share the same grid for one range, so timestamps line up across hosts.
 export function mergeHosts(hosts: HostRef[], data: Map<string, Point[]>, pick: (p: Point) => number) {

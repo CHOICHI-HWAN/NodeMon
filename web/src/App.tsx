@@ -15,7 +15,15 @@ import { RangeMenu } from "./ui";
 
 export default function App() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
-  const load = useCallback(() => api.me().then(setUser).catch((e) => e instanceof Unauthorized || setUser(null)), []);
+  const [startupError, setStartupError] = useState<string | null>(null);
+  const load = useCallback(
+    () =>
+      api.me().then(setUser).catch((e) => {
+        setUser(null);
+        if (!(e instanceof Unauthorized)) setStartupError(e instanceof Error ? e.message : String(e)); // a broken setup, not just "not signed in"
+      }),
+    [],
+  );
   useEffect(() => {
     load();
     const f = () => setUser(null);
@@ -24,7 +32,7 @@ export default function App() {
   }, [load]);
 
   if (user === undefined) return null;
-  if (user === null) return <Login onLogin={load} />;
+  if (user === null) return <Login onLogin={load} startupError={startupError} />;
   return <Dashboard user={user} />;
 }
 

@@ -9,8 +9,7 @@ dist/
 dist-demo/
 firebase/database.rules.json
 .firebaserc
-web/dist-firebase/
 web/.env.*.local
-web/dist-emu/
 firebase/.allowed-emails
 web/public/downloads/
+web/dist-*/
