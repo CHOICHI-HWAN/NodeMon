@@ -219,7 +219,7 @@ table.nodes tr.offline td:not(:first-child):not(:nth-child(2)) { opacity: 0.6; }
 
 /* add-computer dialog */
 .overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: grid; place-items: center; padding: 16px; z-index: 30; }
-.modal { width: min(560px, 100%); max-height: 100%; overflow: auto; display: flex; flex-direction: column; gap: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+.modal { width: min(680px, 100%); max-height: 100%; overflow: auto; display: flex; flex-direction: column; gap: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
 .modal-head { display: flex; justify-content: space-between; align-items: center; }
 .code { font-size: 28px; font-weight: 700; letter-spacing: 2px; text-align: center; padding: 10px; border: 1px dashed var(--axis); border-radius: 8px; user-select: all; font-variant-numeric: tabular-nums; }
 .steps { margin: 0; padding-left: 20px; color: var(--ink-2); }
@@ -244,3 +244,14 @@ a.menu-item { display: block; border-radius: 6px; color: var(--ink); }
 a.menu-item:hover { background: var(--hover); text-decoration: none; }
 .login-foot { margin: 0; font-size: 12px; color: var(--muted); }
 .menu-note { padding: 6px 10px 2px; border-top: 1px solid var(--border); font-size: 11px; line-height: 1.4; color: var(--muted); }
+.step-title { font-size: 14px; margin: 10px 0 0; }
+.select { font: inherit; color: var(--ink); background: var(--page); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; max-width: 100%; }
+.help { border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; }
+.help summary { cursor: pointer; color: var(--ink-2); font-size: 13px; }
+.help ul { margin: 6px 0; padding-left: 18px; }
+.file { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
+.cmd-box pre { flex: 1; margin: 0; overflow-x: auto; font-size: 12px; line-height: 1.5; }
+.cmd-box button { align-self: flex-start; }
+.sub code { font-size: 12px; background: var(--page); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+.modal > * { flex-shrink: 0; }
+.cmd-box code { white-space: pre-wrap; word-break: break-all; overflow-x: visible; }

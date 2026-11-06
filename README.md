@@ -94,6 +94,48 @@ node firebase/deploy.mjs --emails 내계정@gmail.com
 | 대시보드가 비어 있고 콘솔에 URL 오류 | `.env.firebase.local`의 `DATABASE_URL`이 콘솔에 표시된 값(리전 포함)과 다릅니다. 수정 후 다시 빌드·배포하세요. |
 | 노드가 "오프라인"으로만 표시 | Connector가 실행 중인지, Netdata(`localhost:19999`)가 응답하는지 확인하세요. |
 
+### Connector 설치 (자세히)
+Connector는 Netdata가 설치된 컴퓨터마다 하나씩 실행합니다. 대시보드의 **컴퓨터 추가** 창에서 OS와 CPU 종류를 고르면 아래 내용이 그대로 나옵니다. 미리 만들어 둔 다운로드 파일은 아직 없어서 직접 빌드해야 합니다.
+
+**1. 파일 만들기** (Go 1.24 이상이 있는 아무 컴퓨터 한 대에서)
+```
+git clone https://github.com/CHOICHI-HWAN/NodeMon && cd NodeMon
+git checkout feat/nodemon-mvp        # 아직 main에 합치기 전이라면
+./build-connector.sh
+```
+`dist/`에 모든 종류가 만들어집니다. 등록할 컴퓨터가 Windows라면 `build-connector.sh`는 못 돌리니 다른 컴퓨터에서 만든 `.exe`를 복사하세요.
+
+**2. 내 컴퓨터에 맞는 파일 고르기** — 등록할 컴퓨터에서 아래 명령을 실행해 나온 값으로 고릅니다.
+
+| OS | 확인 명령 | 나온 값 | 사용할 파일 |
+|---|---|---|---|
+| Linux | `uname -m` | `x86_64` (일반 PC·서버·대부분의 NAS) | `nodemon-connector-linux-amd64` |
+| Linux | `uname -m` | `aarch64` (라즈베리파이 4·5 64비트, ARM 서버) | `nodemon-connector-linux-arm64` |
+| Linux | `uname -m` | `armv7l` (라즈베리파이 32비트 OS) | `nodemon-connector-linux-arm` |
+| macOS | `uname -m` | `arm64` (M1·M2·M3·M4) | `nodemon-connector-darwin-arm64` |
+| macOS | `uname -m` | `x86_64` (Intel 맥) | `nodemon-connector-darwin-amd64` |
+| Windows | PowerShell: `$env:PROCESSOR_ARCHITECTURE` | `AMD64` | `nodemon-connector-windows-amd64.exe` |
+
+위 표에 없는 종류(예: `armv6l`, Windows ARM)는 지원 파일이 없습니다. **가장 쉬운 방법은 등록할 컴퓨터에서 직접 빌드하는 것**입니다. 그 컴퓨터용 파일이 자동으로 만들어져서 종류를 고를 필요가 없습니다.
+```
+cd connector && go build -o nodemon-connector . && cd ..      # 파일 이름: nodemon-connector
+```
+
+**3. 등록할 컴퓨터로 복사** (예: `scp dist/nodemon-connector-linux-arm64 pi@192.168.0.10:~/`)
+
+**4. 등록 (한 번만 실행)** — 대시보드가 보여 주는 명령을 그대로 복사해 파일이 있는 폴더에서 실행합니다.
+```
+# Linux / macOS (파일 이름은 2번에서 고른 것)
+chmod +x ./nodemon-connector-linux-amd64 && ./nodemon-connector-linux-amd64 --firebase-api-key … --firebase-db-url … --code XXXX-XXXX-XXXX
+# Windows (PowerShell)
+.\nodemon-connector-windows-amd64.exe --firebase-api-key … --firebase-db-url … --code XXXX-XXXX-XXXX
+```
+`enrolled`가 나오면 성공입니다. 이후에도 실행이 계속되므로 시험이 끝나면 `Ctrl+C`로 멈추세요.
+- macOS가 "확인되지 않은 개발자"라고 막으면 `xattr -d com.apple.quarantine ./파일이름`, `Killed: 9`로 종료되면 `codesign -s - ./파일이름`을 실행하세요.
+- Windows가 "PC를 보호했습니다"라고 하면 **추가 정보 → 실행**을 누르세요.
+
+**5. 켤 때마다 자동 실행** — 등록이 성공한 뒤 대시보드 창의 "자동 실행 설정 보기"에 나오는 명령을 실행합니다. Linux는 systemd 서비스, macOS는 launchd, Windows는 작업 스케줄러(로그인할 때 실행)로 등록합니다. macOS와 Windows 방법은 아직 실제 장비에서 검증하지 못했습니다.
+
 ### 데이터 구조
 - Connector는 `--interval`(기본 10초)마다 측정하지만, **업로드는 `--upload-every`(기본 3분)마다 한 번**만 합니다. 그 사이의 측정값은 PC 안에서 평균을 내고, 현재값과 끝난 1분 평균(필요하면 1시간 평균)을 요청 **한 건**에 묶어 보냅니다.
 - `latest/<기기>`: 현재값. `m/<기기>/<날짜>`: 1분 평균(2일 보관). `h/<기기>/<월>`: 1시간 평균(100일 보관). 오래된 데이터는 Connector가 스스로 지웁니다.

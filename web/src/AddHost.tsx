@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { useEffect, useState } from "react";
 import { api, type EnrollCode } from "./api";
+import {
+  ARCHES, autostartScript, BUILD_LOCAL, checkCommand, fileName, guessOs, OS_LABEL, runCommand,
+  type Arch, type Build, type Os,
+} from "./connectorTargets";
 
-function Cmd({ label, text }: { label: string; text: string }) {
+function Cmd({ label, text }: { label?: string; text: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -10,14 +14,14 @@ function Cmd({ label, text }: { label: string; text: string }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      /* clipboard unavailable: user can select the text */
+      /* clipboard unavailable: the text is selectable */
     }
   };
   return (
     <div className="cmd">
-      <div className="cmd-label">{label}</div>
+      {label && <div className="cmd-label">{label}</div>}
       <div className="cmd-box">
-        <code>{text}</code>
+        {text.includes("\n") ? <pre>{text}</pre> : <code>{text}</code>}
         <button className="link" onClick={copy}>{copied ? "복사됨" : "복사"}</button>
       </div>
     </div>
@@ -27,6 +31,9 @@ function Cmd({ label, text }: { label: string; text: string }) {
 export function AddHost({ onClose }: { onClose: () => void }) {
   const [code, setCode] = useState<EnrollCode | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [os, setOs] = useState<Os>(guessOs);
+  const [arch, setArch] = useState<Arch>("amd64");
+  const [build, setBuild] = useState<Build>("dist");
 
   useEffect(() => {
     api.createCode().then(setCode).catch((e) => setError(String(e)));
@@ -35,7 +42,13 @@ export function AddHost({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", esc);
   }, [onClose]);
 
+  const pickOs = (next: Os) => {
+    setOs(next);
+    setArch(ARCHES[next][0].arch); // default to the first (most common) CPU type of that OS
+  };
+  const file = fileName(os, arch, build);
   const args = code?.args ?? "";
+
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal card" role="dialog" aria-modal="true" aria-label="컴퓨터 추가" onClick={(e) => e.stopPropagation()}>
@@ -49,15 +62,83 @@ export function AddHost({ onClose }: { onClose: () => void }) {
           <>
             <p className="sub">등록 코드 (15분 안에 한 번만 사용 가능)</p>
             <div className="code">{code.code}</div>
-            <ol className="steps">
-              <li>
-                대상 컴퓨터에 <a href="https://learn.netdata.cloud/docs/netdata-agent/installation" target="_blank" rel="noreferrer">Netdata 에이전트</a>를 설치합니다. Netdata Cloud 연결(claim)은 필요 없습니다. Netdata는 별도로 설치하는 타사 소프트웨어이며 NodeMon과 무관합니다.
-              </li>
-              <li>같은 컴퓨터에서 NodeMon Connector를 아래 명령으로 한 번 실행해 등록합니다.</li>
-            </ol>
-            <Cmd label="Linux / macOS" text={`./nodemon-connector ${args}`} />
-            <Cmd label="Windows (PowerShell)" text={`.\\nodemon-connector.exe ${args}`} />
-            <p className="sub">등록 후에는 자격 증명이 저장되므로 인자 없이 실행하면 됩니다. 서비스로 등록하는 방법은 README를 참고하세요.</p>
+
+            <h3 className="step-title">1. Netdata 설치</h3>
+            <p className="sub">
+              등록할 컴퓨터에 <a href="https://learn.netdata.cloud/docs/netdata-agent/installation" target="_blank" rel="noreferrer">Netdata 에이전트</a>를 설치합니다.
+              Netdata Cloud 연결(claim)은 필요 없습니다. Netdata는 별도로 설치하는 타사 소프트웨어이며 NodeMon과 무관합니다.
+            </p>
+
+            <h3 className="step-title">2. 등록할 컴퓨터의 종류 선택</h3>
+            <div className="seg" role="group" aria-label="운영체제">
+              {(Object.keys(OS_LABEL) as Os[]).map((o) => (
+                <button key={o} className={os === o ? "active" : ""} aria-pressed={os === o} onClick={() => pickOs(o)}>{OS_LABEL[o]}</button>
+              ))}
+            </div>
+            {ARCHES[os].length > 1 && (
+              <>
+                <label htmlFor="arch" className="sub">CPU 종류</label>
+                <select id="arch" className="select" value={arch} onChange={(e) => setArch(e.target.value as Arch)}>
+                  {ARCHES[os].map((a) => <option key={a.arch} value={a.arch}>{a.label}</option>)}
+                </select>
+              </>
+            )}
+            <details className="help">
+              <summary>내 컴퓨터가 어떤 종류인지 모르겠어요</summary>
+              <p className="sub">등록할 컴퓨터의 터미널{os === "windows" ? "(PowerShell)" : ""}에서 아래 명령을 실행하고 나온 값을 보세요.</p>
+              <Cmd text={checkCommand(os)} />
+              <ul className="sub">
+                {ARCHES[os].map((a) => <li key={a.arch}><code>{a.reported}</code> → {a.label.split(" — ")[1] ?? a.label}</li>)}
+              </ul>
+            </details>
+
+            <h3 className="step-title">3. Connector 프로그램 준비</h3>
+            <div className="seg" role="group" aria-label="준비 방법">
+              <button className={build === "dist" ? "active" : ""} aria-pressed={build === "dist"} onClick={() => setBuild("dist")}>만들어 둔 파일 복사</button>
+              <button className={build === "local" ? "active" : ""} aria-pressed={build === "local"} onClick={() => setBuild("local")}>이 컴퓨터에서 직접 빌드</button>
+            </div>
+            {build === "dist" ? (
+              <p className="sub">
+                저장소에서 <code>./build-connector.sh</code>를 실행하면 <code>dist/</code> 폴더에 모든 종류의 파일이 만들어집니다.
+                그중 <strong className="file">{file}</strong> 을 등록할 컴퓨터로 복사하세요(USB, <code>scp</code> 등).
+              </p>
+            ) : (
+              <>
+                <p className="sub">등록할 컴퓨터에 Go(1.24 이상)와 저장소가 있으면 CPU 종류를 고를 필요 없이 그 컴퓨터용 파일이 만들어집니다. 저장소 폴더에서:</p>
+                <Cmd text={BUILD_LOCAL} />
+                <p className="sub">만들어진 파일은 <strong className="file">{file}</strong> 입니다(저장소 폴더 안).</p>
+              </>
+            )}
+
+            <h3 className="step-title">4. 등록 (한 번만 실행)</h3>
+            <p className="sub">파일이 있는 폴더의 터미널{os === "windows" ? "(PowerShell)" : ""}에서 실행합니다.</p>
+            <Cmd text={runCommand(os, file, args)} />
+            <p className="sub">
+              <code>enrolled</code>가 나오면 등록 성공이고, 이 화면의 <strong>노드</strong>에 곧 나타납니다. 이후에도 실행이 계속되므로 시험이 끝나면 <code>Ctrl+C</code>로 멈추세요.
+              기본으로 3분마다 업로드하며, 명령 끝에 <code>--upload-every 5m</code>을 붙이면 간격을 바꿀 수 있습니다.
+            </p>
+            {os === "darwin" && (
+              <details className="help">
+                <summary>macOS가 실행을 막을 때</summary>
+                <p className="sub">"확인되지 않은 개발자" 경고가 나오면(브라우저로 내려받은 파일):</p>
+                <Cmd text={`xattr -d com.apple.quarantine ./${file}`} />
+                <p className="sub"><code>Killed: 9</code>로 종료되면:</p>
+                <Cmd text={`codesign -s - ./${file}`} />
+              </details>
+            )}
+            {os === "windows" && (
+              <p className="sub">Windows가 "PC를 보호했습니다" 창을 띄우면 <strong>추가 정보 → 실행</strong>을 누르세요.</p>
+            )}
+
+            <h3 className="step-title">5. 켤 때마다 자동으로 실행 (선택)</h3>
+            <details className="help">
+              <summary>자동 실행 설정 보기</summary>
+              <p className="sub">4번에서 등록이 성공한 뒤에 하세요. 등록할 때 저장된 자격 증명을 그대로 씁니다.</p>
+              <Cmd text={autostartScript(os, file)} />
+              {os !== "linux" && (
+                <p className="sub">※ 이 방법은 아직 실제 {OS_LABEL[os]} 장비에서 검증하지 못했습니다. 동작하지 않으면 알려 주세요.</p>
+              )}
+            </details>
           </>
         )}
       </div>
