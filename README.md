@@ -1,5 +1,8 @@
 # NodeMon
 
+> **NodeMon은 Netdata, Inc.와 아무런 관련이 없는 독립 프로젝트입니다.** Netdata, Inc.가 만들거나 후원하거나 보증한 것이 아니며, Netdata는 Netdata, Inc.의 상표입니다.
+> *NodeMon is an independent project. It is not affiliated with, endorsed by, or sponsored by Netdata, Inc. Netdata is a trademark of Netdata, Inc.*
+
 여러 컴퓨터의 자원 사용 현황(CPU·메모리·디스크·네트워크·부하)을 Google 계정 하나로 모아 보는 대시보드.
 수집은 무료 오픈소스 [Netdata 에이전트](https://learn.netdata.cloud/docs/netdata-agent/installation)에 맡기고,
 이 프로젝트는 **계정 연동 · 컴퓨터 등록 · 멀티 호스트 통합 화면**을 담당합니다.

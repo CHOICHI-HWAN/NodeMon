@@ -35,6 +35,7 @@ export function Login({ onLogin }: { onLogin: () => void }) {
           </div>
         )}
         {error && <p className="err">{error}</p>}
+        <p className="login-foot">NodeMon은 Netdata, Inc.와 무관한 독립 프로젝트입니다. Netdata는 Netdata, Inc.의 상표입니다.</p>
         <p className="login-foot">
           GPL-3.0-or-later · <a href="https://github.com/CHOICHI-HWAN/NodeMon" target="_blank" rel="noreferrer">소스 코드</a> ·{" "}
           <a href="/third-party-licenses.txt" target="_blank" rel="noreferrer">오픈소스 라이선스</a>

@@ -51,7 +51,7 @@ export function AddHost({ onClose }: { onClose: () => void }) {
             <div className="code">{code.code}</div>
             <ol className="steps">
               <li>
-                대상 컴퓨터에 <a href="https://learn.netdata.cloud/docs/netdata-agent/installation" target="_blank" rel="noreferrer">Netdata 에이전트</a>를 설치합니다. Netdata Cloud 연결(claim)은 필요 없습니다.
+                대상 컴퓨터에 <a href="https://learn.netdata.cloud/docs/netdata-agent/installation" target="_blank" rel="noreferrer">Netdata 에이전트</a>를 설치합니다. Netdata Cloud 연결(claim)은 필요 없습니다. Netdata는 별도로 설치하는 타사 소프트웨어이며 NodeMon과 무관합니다.
               </li>
               <li>같은 컴퓨터에서 NodeMon Connector를 아래 명령으로 한 번 실행해 등록합니다.</li>
             </ol>

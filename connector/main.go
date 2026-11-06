@@ -138,6 +138,11 @@ func main() {
 		upload    = flag.Duration("upload-every", 3*time.Minute, "Firebase backend: how often to upload; measurements in between are averaged locally")
 		cfgPath   = flag.String("config", defaultConfigPath(), "path of the saved credentials")
 	)
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "NodeMon connector: sends this computer's resource usage, read from a local Netdata Agent, to your NodeMon dashboard.\n"+
+			"NodeMon is an independent project, not affiliated with Netdata, Inc. Netdata is a trademark of Netdata, Inc.\n\nUsage:\n")
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 	client := newHTTPClient()
 

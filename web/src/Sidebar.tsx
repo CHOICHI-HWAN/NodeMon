@@ -65,6 +65,7 @@ export function Sidebar({ route, email, onAdd, onLogout }: Props) {
             <a className="menu-item" role="menuitem" href="https://github.com/CHOICHI-HWAN/NodeMon" target="_blank" rel="noreferrer">소스 코드 (GPL-3.0)</a>
             {!DEMO && <a className="menu-item" role="menuitem" href="/third-party-licenses.txt" target="_blank" rel="noreferrer">오픈소스 라이선스</a>}
             {!DEMO && <button className="menu-item" role="menuitem" onClick={onLogout}>로그아웃</button>}
+            <div className="menu-note">NodeMon은 Netdata, Inc.와 무관한 독립 프로젝트입니다.</div>
           </div>
         )}
       </div>
