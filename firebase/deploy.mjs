@@ -70,7 +70,6 @@ if (fbJson.hosting.site !== cfg.site) {
 writeFileSync(
   path.join(web, ".env.firebase.local"),
   [
-    "VITE_BACKEND=firebase",
     `VITE_FIREBASE_API_KEY=${cfg.apiKey}`,
     `VITE_FIREBASE_AUTH_DOMAIN=${cfg.authDomain}`,
     `VITE_FIREBASE_DATABASE_URL=${cfg.databaseURL}`,
@@ -88,22 +87,34 @@ log(`  firebase/database.rules.json (${list.length}개 계정)`);
 // ---- 3. connector downloads, served by the dashboard itself (needs Go; falls back to an earlier ./build-connector.sh)
 step("Connector 다운로드 파일 준비");
 const downloads = path.join(web, "public", "downloads");
-const connectorBuild = spawnSync(process.execPath, [path.join(root, "scripts", "build-connector.mjs"), "--out", downloads], { cwd: root, stdio: "inherit" });
-if (connectorBuild.status !== 0) {
-  const dist = path.join(root, "dist");
-  const prebuilt = existsSync(dist) ? readdirSync(dist).filter((n) => n.startsWith("nodemon-connector-")) : [];
-  if (prebuilt.length) {
-    mkdirSync(downloads, { recursive: true });
-    const sums = [];
-    for (const n of prebuilt) {
-      copyFileSync(path.join(dist, n), path.join(downloads, n));
-      sums.push(`${createHash("sha256").update(readFileSync(path.join(dist, n))).digest("hex")}  ${n}`);
+const listDownloads = () => (existsSync(downloads) ? readdirSync(downloads).filter((n) => n.startsWith("nodemon-connector-")) : []);
+if (flag("--no-downloads")) {
+  log("  --no-downloads: Connector 다운로드 파일 없이 배포합니다.");
+} else {
+  const connectorBuild = spawnSync(process.execPath, [path.join(root, "scripts", "build-connector.mjs"), "--out", downloads], { cwd: root, stdio: "inherit" });
+  if (connectorBuild.status !== 0) {
+    const dist = path.join(root, "dist");
+    const prebuilt = existsSync(dist) ? readdirSync(dist).filter((n) => n.startsWith("nodemon-connector-")) : [];
+    if (prebuilt.length) {
+      mkdirSync(downloads, { recursive: true });
+      const sums = [];
+      for (const n of prebuilt) {
+        copyFileSync(path.join(dist, n), path.join(downloads, n));
+        sums.push(`${createHash("sha256").update(readFileSync(path.join(dist, n))).digest("hex")}  ${n}`);
+      }
+      writeFileSync(path.join(downloads, "SHA256SUMS"), sums.join("\n") + "\n");
+      log(`  Go로 새로 빌드하지 못해 dist/의 기존 파일 ${prebuilt.length}개를 사용합니다.`);
     }
-    writeFileSync(path.join(downloads, "SHA256SUMS"), sums.join("\n") + "\n");
-    log(`  Go로 새로 빌드하지 못해 dist/의 기존 파일 ${prebuilt.length}개를 사용합니다.`);
-  } else {
-    log("  ⚠ Connector 다운로드 파일 없이 배포합니다. Go를 설치하고 다시 실행하면 다운로드 링크가 생깁니다. (대시보드는 정상 동작합니다)");
   }
+  // Deploying without the files would leave the "download now" option in the add-computer dialog pointing at nothing,
+  // and the only hint was a log line that is easy to miss. So stop, unless the person asked for it.
+  if (listDownloads().length === 0) {
+    die(`Connector 다운로드 파일이 없습니다. 이대로 배포하면 '컴퓨터 추가' 창의 '바로 다운로드'가 동작하지 않습니다.
+  - Go(1.24 이상, https://go.dev/dl/)를 설치하고 다시 실행하거나,
+  - Go가 있는 컴퓨터에서 ./build-connector.sh 로 만든 dist/ 폴더를 이 저장소에 복사한 뒤 다시 실행하세요.
+  대시보드만 올리려면 --no-downloads 를 붙이세요.`);
+  }
+  log(`  다운로드 파일 ${listDownloads().length}개 준비됨`);
 }
 
 // ---- 4. build the dashboard
@@ -146,6 +157,7 @@ log(`
 ✔ 배포 완료
 
   대시보드 : https://${cfg.site}.web.app
+  다운로드 : ${listDownloads().length}개 파일 (https://${cfg.site}.web.app/downloads/…)
 
   남은 일 (콘솔에서 한 번만):
    1. Authentication > 로그인 방법: Google 과 익명 을 모두 사용 설정

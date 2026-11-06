@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // Command nodemon-connector reads a local Netdata Agent and sends the computer's resource usage to a
-// NodeMon dashboard (Firebase Realtime Database, or the self-hosted NodeMon server).
+// NodeMon dashboard through Firebase Realtime Database.
 package main
 
 import (

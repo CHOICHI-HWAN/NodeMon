@@ -31,21 +31,6 @@ jobs:
       - name: Cross-compile every supported computer type
         run: node scripts/build-connector.mjs --out "$RUNNER_TEMP/dist"
 
-  server:
-    name: Self-hosted server (Go)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: server/go.mod
-          cache-dependency-path: server/go.sum
-      - working-directory: server
-        run: |
-          test -z "$(gofmt -l .)"
-          go vet ./...
-          go build ./...
-
   web:
     name: Dashboard (TypeScript)
     runs-on: ubuntu-latest
@@ -71,8 +56,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version-file: server/go.mod
-          cache-dependency-path: server/go.sum
+          go-version-file: connector/go.mod
+          cache-dependency-path: connector/go.mod
       - uses: actions/setup-node@v4
         with:
           node-version: 22

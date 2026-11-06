@@ -3,18 +3,15 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"os"
 	"path/filepath"
 	"time"
 )
 
-// config is saved after enrolment. Backend is "server" (NodeMon Go server) or "firebase".
+// config is what is saved after enrolment.
 type config struct {
-	Backend  string   `json:"backend,omitempty"`
-	Server   string   `json:"server,omitempty"`
-	APIKey   string   `json:"api_key,omitempty"`
-	HostID   int64    `json:"host_id,omitempty"`
 	Firebase *fbSaved `json:"firebase,omitempty"`
 	// Usage is the running total of bytes sent to and received from Firebase since this computer was registered.
 	Usage *usageSaved `json:"usage,omitempty"`
@@ -23,13 +20,6 @@ type config struct {
 type usageSaved struct {
 	Up   int64 `json:"up"`
 	Down int64 `json:"down"`
-}
-
-func (c config) backend() string {
-	if c.Backend == "" {
-		return "server" // files written before the Firebase backend existed
-	}
-	return c.Backend
 }
 
 func defaultConfigPath() string {
@@ -46,7 +36,14 @@ func loadConfig(path string) (config, error) {
 	if err != nil {
 		return c, err
 	}
-	return c, json.Unmarshal(b, &c)
+	if err := json.Unmarshal(b, &c); err != nil {
+		return c, err
+	}
+	if c.Firebase == nil {
+		// Files written by builds that could also talk to a self-hosted NodeMon server (since removed) have no Firebase part.
+		return c, errors.New("these saved credentials are not for Firebase (they were made by an older version); register the computer again with a new code")
+	}
+	return c, nil
 }
 
 func saveConfig(path string, c config) error {
@@ -70,23 +67,19 @@ type credStore struct {
 
 func newCredStore(path string, cfg *config, usage *usageCounter) *credStore {
 	s := &credStore{path: path, cfg: cfg, usage: usage, now: time.Now}
-	if cfg.Firebase != nil {
-		s.savedRefresh = cfg.Firebase.RefreshToken
-	}
+	s.savedRefresh = cfg.Firebase.RefreshToken
 	s.lastWrite = s.now()
 	return s
 }
 
 func (s *credStore) save(force bool) {
 	up, down := s.usage.snapshot()
-	rotated := s.cfg.Firebase != nil && s.cfg.Firebase.RefreshToken != s.savedRefresh
+	rotated := s.cfg.Firebase.RefreshToken != s.savedRefresh
 	grew := s.cfg.Usage == nil || up != s.cfg.Usage.Up || down != s.cfg.Usage.Down
 	if !rotated && !(grew && (force || s.now().Sub(s.lastWrite) >= time.Minute)) {
 		return
 	}
-	if s.cfg.Firebase != nil {
-		s.savedRefresh = s.cfg.Firebase.RefreshToken
-	}
+	s.savedRefresh = s.cfg.Firebase.RefreshToken
 	s.cfg.Usage = &usageSaved{Up: up, Down: down}
 	s.lastWrite = s.now()
 	if err := saveConfig(s.path, *s.cfg); err != nil {

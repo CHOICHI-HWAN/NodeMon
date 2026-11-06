@@ -18,7 +18,6 @@ var version = "dev"
 var errBadFlags = errors.New("invalid command line")
 
 type options struct {
-	server      string
 	fbKey       string
 	fbDB        string
 	fbAuthURL   string
@@ -38,17 +37,16 @@ func parseOptions(args []string, errOut io.Writer) (options, error) {
 	o := options{}
 	fs := flag.NewFlagSet("nodemon-connector", flag.ContinueOnError)
 	fs.SetOutput(errOut)
-	fs.StringVar(&o.server, "server", "", "NodeMon server URL (server backend, with --code)")
-	fs.StringVar(&o.fbKey, "firebase-api-key", "", "Firebase web API key (Firebase backend, with --code)")
-	fs.StringVar(&o.fbDB, "firebase-db-url", "", "Realtime Database URL (Firebase backend, with --code)")
+	fs.StringVar(&o.fbKey, "firebase-api-key", "", "Firebase web API key (with --code)")
+	fs.StringVar(&o.fbDB, "firebase-db-url", "", "Realtime Database URL (with --code)")
 	fs.StringVar(&o.fbAuthURL, "firebase-auth-url", "", "override the Firebase Auth endpoint (emulator only)")
 	fs.StringVar(&o.fbTokenURL, "firebase-token-url", "", "override the Firebase token endpoint (emulator only)")
 	fs.StringVar(&o.code, "code", "", "one-time enrollment code from the dashboard")
 	fs.StringVar(&o.name, "name", hostname, "display name for this computer")
 	fs.StringVar(&o.netdata, "netdata", "http://127.0.0.1:19999", "local Netdata agent URL")
-	fs.DurationVar(&o.interval, "interval", 10*time.Second, "how often to measure (server backend: also how often to send)")
-	fs.BoolVar(&o.compress, "compress", false, "Firebase backend, experimental: gzip upload bodies; falls back to plain if the database refuses them")
-	fs.DurationVar(&o.upload, "upload-every", 3*time.Minute, "Firebase backend: how often to upload; measurements in between are averaged locally")
+	fs.DurationVar(&o.interval, "interval", 10*time.Second, "how often to measure")
+	fs.BoolVar(&o.compress, "compress", false, "experimental: gzip upload bodies; falls back to plain if the database refuses them")
+	fs.DurationVar(&o.upload, "upload-every", 3*time.Minute, "how often to upload; measurements in between are averaged locally")
 	fs.StringVar(&o.cfgPath, "config", defaultConfigPath(), "path of the saved credentials")
 	fs.BoolVar(&o.showVersion, "version", false, "print the version and exit")
 	fs.Usage = func() {
@@ -80,21 +78,16 @@ func (o options) validate() error {
 	if o.code == "" {
 		return nil
 	}
-	switch {
-	case o.fbDB != "":
-		if o.fbKey == "" {
-			return errors.New("--firebase-api-key is required together with --firebase-db-url")
+	if o.fbDB == "" || o.fbKey == "" {
+		return errors.New("--code needs --firebase-db-url and --firebase-api-key (the dashboard's add-computer window shows the full command)")
+	}
+	for flagName, raw := range map[string]string{"--firebase-db-url": o.fbDB, "--firebase-auth-url": o.fbAuthURL, "--firebase-token-url": o.fbTokenURL} {
+		if raw == "" {
+			continue
 		}
-		for flagName, raw := range map[string]string{"--firebase-db-url": o.fbDB, "--firebase-auth-url": o.fbAuthURL, "--firebase-token-url": o.fbTokenURL} {
-			if raw == "" {
-				continue
-			}
-			if err := checkSecureURL(raw); err != nil {
-				return fmt.Errorf("%s: %w", flagName, err)
-			}
+		if err := checkSecureURL(raw); err != nil {
+			return fmt.Errorf("%s: %w", flagName, err)
 		}
-	case o.server == "":
-		return errors.New("--code needs either --server or --firebase-db-url")
 	}
 	return nil
 }

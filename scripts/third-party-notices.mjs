@@ -81,21 +81,21 @@ for (const dir of [...pkgDirs].sort()) {
   pkgs.push({ ecosystem: "npm (bundled into the web app)", name: pj.name, version: pj.version, license: lic, source: repo.replace(/^git\+/, "").replace(/^git:\/\//, "https://").replace(/\.git$/, "") || `https://www.npmjs.com/package/${pj.name}`, text, notice: noticeNear(dir), note });
 }
 
-// ---- Go modules linked into the server (the connector uses only the standard library)
-const mods = sh("go", ["list", "-deps", "-f", "{{with .Module}}{{if not .Main}}{{.Path}}|{{.Version}}|{{.Dir}}{{end}}{{end}}", "./..."], path.join(root, "server"))
+// ---- Go modules linked into the connector (today none: it uses only the standard library)
+const mods = sh("go", ["list", "-deps", "-f", "{{with .Module}}{{if not .Main}}{{.Path}}|{{.Version}}|{{.Dir}}{{end}}{{end}}", "./..."], path.join(root, "connector"))
   .split("\n").filter(Boolean);
 for (const line of [...new Set(mods)].sort()) {
   const [name, version, dir] = line.split("|");
   const file = readdirSync(dir).find((n) => /^(licen[cs]e|copying)(\.(md|txt))?$/i.test(n));
   const text = file ? readFileSync(path.join(dir, file), "utf8").trim() : "";
-  pkgs.push({ ecosystem: "Go module (server)", name, version, license: guessSpdx(text), source: `https://pkg.go.dev/${name}`, text, notice: noticeNear(dir) });
+  pkgs.push({ ecosystem: "Go module (connector)", name, version, license: guessSpdx(text), source: `https://pkg.go.dev/${name}`, text, notice: noticeNear(dir) });
 }
 
 // ---- Go standard library and runtime, which are compiled into every Go binary we build
-// Ask from inside the server module so we report the toolchain its go.mod selects, not the system default.
-const goroot = sh("go", ["env", "GOROOT"], path.join(root, "server")).trim();
-const goVersion = sh("go", ["env", "GOVERSION"], path.join(root, "server")).trim();
-pkgs.push({ ecosystem: "Go standard library (server and connector binaries)", name: "go", version: goVersion, license: "BSD-3-Clause", source: "https://go.dev", text: readFileSync(path.join(goroot, "LICENSE"), "utf8").trim(), notice: "" });
+// Ask from inside the connector module so we report the toolchain its go.mod selects, not the system default.
+const goroot = sh("go", ["env", "GOROOT"], path.join(root, "connector")).trim();
+const goVersion = sh("go", ["env", "GOVERSION"], path.join(root, "connector")).trim();
+pkgs.push({ ecosystem: "Go standard library (compiled into the connector)", name: "go", version: goVersion, license: "BSD-3-Clause", source: "https://go.dev", text: readFileSync(path.join(goroot, "LICENSE"), "utf8").trim(), notice: "" });
 
 // ---- verify
 const problems = [];
@@ -125,7 +125,7 @@ let out = `# Third-party licenses
 NodeMon is licensed under the GNU General Public License, version 3 or (at your option) any later version
 (see [LICENSE](LICENSE)). It includes or links the third-party software listed below, each under its own license.
 All of these licenses are compatible with the GPL-3.0. Only software that ships with NodeMon is listed:
-the web app's production npm packages, the Go modules linked into the server, and the Go standard library.
+the web app's production npm packages, any Go modules linked into the connector, and the Go standard library.
 Development tools (for example the bundler and type checker) are not distributed and are not listed.
 
 NodeMon does not include any Netdata code, dashboard UI or logo. It reads the local HTTP API of a separately

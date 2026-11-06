@@ -55,7 +55,7 @@ chmod +x ./nodemon-connector-linux-amd64 && ./nodemon-connector-linux-amd64 --fi
 
 - **어디서 읽나**: Netdata가 `system.uptime`을 주면 그 값을 쓰고, 없으면 Connector가 운영체제에서 직접 읽습니다. Linux는 `/proc/uptime`, macOS는 `sysctl kern.boottime`, Windows는 시스템 가동 시간(`GetTickCount64`, 작업 관리자의 "가동 시간"과 같은 값)입니다. 그 밖의 시스템에서는 표시되지 않습니다.
 - **어떻게 보내나**: 업로드할 때마다 현재값에 초 단위 숫자 하나를 더 싣습니다(전송량 증가는 업로드당 약 12바이트). 대시보드는 업로드 이후 지난 시간을 더해서 업로드 사이에도 맞게 보여 줍니다. 컴퓨터가 오프라인이면 "–"입니다.
-- 이 기능이 생기기 전의 Connector로 등록한 컴퓨터는 "–"로 표시되며, 새 Connector로 교체하면 보입니다. macOS와 Windows의 직접 읽기는 아직 실제 장비에서 검증하지 못했습니다(Linux는 확인함). 자체 서버 방식에서는 표시하지 않습니다.
+- 이 기능이 생기기 전의 Connector로 등록한 컴퓨터는 "–"로 표시되며, 새 Connector로 교체하면 보입니다. macOS와 Windows의 직접 읽기는 아직 실제 장비에서 검증하지 못했습니다(Linux는 확인함).
 
 ### 압축과 연결 재사용
 업로드 데이터를 줄이기 위해 다음을 하고 있습니다. 측정값은 이 저장소의 테스트로 확인할 수 있습니다.

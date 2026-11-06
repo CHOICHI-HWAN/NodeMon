@@ -1,7 +1,5 @@
 node_modules/
 web/dist/
-server/webdist/*
-!server/webdist/.gitkeep
 *.db
 *.db-*
 .env
@@ -13,3 +11,4 @@ web/.env.*.local
 firebase/.allowed-emails
 web/public/downloads/
 web/dist-*/
+*-debug.log

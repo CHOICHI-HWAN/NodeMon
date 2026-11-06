@@ -31,7 +31,6 @@
 | [Firebase로 쓰기](docs/firebase.md) | 콘솔 설정, 배포, 업데이트, 처음 시험할 때의 문제 해결 |
 | [Connector 설치](docs/connector.md) | Linux·macOS·Windows별 파일 고르기, 등록, 자동 실행, 가동 시간 |
 | [데이터 구조·전송량·사용량](docs/data-and-usage.md) | 무엇을 저장하나, 한 달 업로드량 계산, 압축, Spark 한도 |
-| [자체 서버로 운영하기](docs/self-hosted.md) | Firebase 대신 NAS·VPS에 서버를 두는 방법(선택) |
 | [개발](docs/development.md) | 실행, 검사, 구성, 알려진 한계 |
 
 ## 라이선스

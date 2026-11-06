@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { demoApi } from "./demo";
+import { DEMO } from "./env";
 
 export type Sample = {
   cpu: number;
@@ -29,7 +30,7 @@ export type Host = {
 export type Usage = { up: number; down: number; up24h: number | null };
 
 export type Point = Sample & { t: number; up?: number; down?: number };
-export type User = { id: number; email: string; name: string };
+export type User = { email: string; name: string };
 // args: the connector command-line arguments that enroll a computer with this code.
 export type EnrollCode = { code: string; expires_at: number; args: string };
 
@@ -51,31 +52,7 @@ export interface Api {
   logout(): Promise<void>;
 }
 
-async function req<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, { credentials: "same-origin", ...init });
-  if (res.status === 401) unauthorized();
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-  return res.status === 204 ? (undefined as T) : res.json();
-}
-
-const realApi: Api = {
-  me: () => req<User>("/api/me"),
-  overview: async () => {
-    const o = await req<{ hosts: (Omit<Host, "id" | "created_at"> & { id: number })[]; now: number }>("/api/overview");
-    return { now: o.now, hosts: o.hosts.map((h) => ({ ...h, id: String(h.id), created_at: h.id })) };
-  },
-  metrics: (id, range) =>
-    req<{ points: Point[]; bucket: number }>(`/api/hosts/${id}/metrics?range=${range}`),
-  deleteHost: (id) => req<void>(`/api/hosts/${id}`, { method: "DELETE" }),
-  createCode: async () => {
-    const c = await req<{ code: string; expires_at: number; server: string }>("/api/enroll-codes", { method: "POST" });
-    return { code: c.code, expires_at: c.expires_at, args: `--server ${c.server} --code ${c.code}` };
-  },
-  logout: () => req<void>("/auth/logout", { method: "POST" }),
-};
-
-// The Firebase SDK is large, so it is only pulled in (lazily) when that backend is selected.
-// The env comparisons are written inline so the bundler can drop the unused branches.
+// The Firebase SDK is large, so it is only pulled in (lazily) when it is actually used: not in the demo build.
 function lazyFirebase(): Api {
   const load = () => import("./firebaseApi").then((m) => m.firebaseApi);
   return {
@@ -90,8 +67,7 @@ function lazyFirebase(): Api {
   };
 }
 
-export const api: Api =
-  import.meta.env.VITE_DEMO === "1" ? demoApi : import.meta.env.VITE_BACKEND === "firebase" ? lazyFirebase() : realApi;
+export const api: Api = DEMO ? demoApi : lazyFirebase();
 
 export const RANGES = [
   { key: "15m", label: "15분", sec: 15 * 60 },
@@ -104,10 +80,10 @@ export const RANGES = [
 export type RangeKey = (typeof RANGES)[number]["key"];
 
 // Long ranges change slowly, so refetching them often only burns bandwidth (it matters on the free Firebase plan).
-// With Firebase the connector uploads every few minutes, so polling faster than that finds nothing new.
-const FIREBASE = import.meta.env.VITE_BACKEND === "firebase";
+// The connector uploads every few minutes, so polling faster than that finds nothing new. The demo's fake data is
+// computed from the clock, so it can refresh quickly and look alive.
 export function pollMs(range: RangeKey): number {
   const base = { "15m": 30_000, "1h": 60_000, "6h": 180_000, "24h": 300_000, "7d": 600_000, "30d": 600_000 }[range];
-  return FIREBASE ? Math.max(120_000, base) : base;
+  return DEMO ? base : Math.max(120_000, base);
 }
-export const OVERVIEW_POLL_MS = FIREBASE ? 60_000 : 10_000;
+export const OVERVIEW_POLL_MS = DEMO ? 10_000 : 60_000;

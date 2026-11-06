@@ -5,11 +5,12 @@
   "license": "GPL-3.0-or-later",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --mode emulator",
     "build": "tsc --noEmit && vite build",
     "build:demo": "tsc --noEmit && vite build --mode demo",
     "build:firebase": "tsc --noEmit && vite build --mode firebase",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:demo": "vite --mode demo"
   },
   "dependencies": {
     "firebase": "^10.14.1",

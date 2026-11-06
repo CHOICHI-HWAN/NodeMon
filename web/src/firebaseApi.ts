@@ -189,7 +189,7 @@ export const firebaseApi: Api = {
   async me() {
     const u = fb().auth.currentUser ?? (await firstAuthState());
     if (!u || u.isAnonymous) unauthorized();
-    return { id: 0, email: u.email ?? "", name: u.displayName ?? u.email ?? "" };
+    return { email: u.email ?? "", name: u.displayName ?? u.email ?? "" };
   },
 
   async login() {

@@ -54,7 +54,7 @@ const RANGE_SEC: Record<string, number> = { "15m": 900, "1h": 3600, "6h": 21600,
 const delay = <T,>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), 120));
 
 export const demoApi: Api = {
-  me: () => delay({ id: 1, email: "demo@example.com", name: "Demo" }),
+  me: () => delay({ email: "demo@example.com", name: "Demo" }),
   overview: () => {
     const now = Math.floor(Date.now() / 1000);
     const hosts: Host[] = specs().map((s) => {

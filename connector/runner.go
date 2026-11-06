@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -45,13 +44,15 @@ func (q *quietLog) recovered(key, message string) {
 	}
 }
 
+var errRejected = errors.New("the database rejected this computer's credentials; it may have been removed from the dashboard. Register it again with a new code")
+
 // runner repeats measure-and-send until the process is stopped.
 type runner struct {
 	mu      sync.Mutex // held while a measurement/upload is in flight, so a file is never written mid-request
 	client  *http.Client
 	netdata string
-	out     sink
-	store   *credStore // nil when the backend keeps nothing locally
+	out     *fbSink
+	store   *credStore
 	logs    *quietLog
 }
 
@@ -75,9 +76,7 @@ func (r *runner) tick() {
 		}
 		r.logs.problem("send", "send: %v", err)
 	}
-	if r.store != nil {
-		r.store.save(false)
-	}
+	r.store.save(false)
 }
 
 // onStop saves the running usage total when the process is asked to stop (Ctrl+C, service stop),
@@ -89,9 +88,7 @@ func (r *runner) onStop() {
 		<-sigs
 		signal.Reset(os.Interrupt, syscall.SIGTERM)
 		r.mu.Lock()
-		if r.store != nil {
-			r.store.save(true)
-		}
+		r.store.save(true)
 		os.Exit(0)
 	}()
 }
@@ -111,7 +108,7 @@ func obtainConfig(o options) (config, *usageCounter, error) {
 	if o.code == "" {
 		cfg, err := loadConfig(o.cfgPath)
 		if err != nil {
-			return cfg, nil, fmt.Errorf("no credentials at %s (run once with --code): %w", o.cfgPath, err)
+			return cfg, nil, fmt.Errorf("no usable credentials at %s (run once with --code): %w", o.cfgPath, err)
 		}
 		usage := newUsageCounter(0, 0)
 		if cfg.Usage != nil {
@@ -121,20 +118,13 @@ func obtainConfig(o options) (config, *usageCounter, error) {
 	}
 
 	usage := newUsageCounter(0, 0)
-	var cfg config
-	var err error
-	if o.fbDB != "" {
-		var saved *fbSaved
-		saved, err = enrollFirebase(newCountingClient(usage, 5*time.Minute),
-			fbSaved{APIKey: o.fbKey, DatabaseURL: o.fbDB, AuthURL: o.fbAuthURL, TokenURL: o.fbTokenURL}, o.code, o.name, runtime.GOOS)
-		up, down := usage.snapshot()
-		cfg = config{Backend: "firebase", Firebase: saved, Usage: &usageSaved{Up: up, Down: down}}
-	} else {
-		cfg, err = enrollServer(newHTTPClient(), strings.TrimRight(o.server, "/"), o.code, o.name)
-	}
+	saved, err := enrollFirebase(newCountingClient(usage, 5*time.Minute),
+		fbSaved{APIKey: o.fbKey, DatabaseURL: o.fbDB, AuthURL: o.fbAuthURL, TokenURL: o.fbTokenURL}, o.code, o.name, runtime.GOOS)
 	if err != nil {
-		return cfg, nil, err
+		return config{}, nil, err
 	}
+	up, down := usage.snapshot()
+	cfg := config{Firebase: saved, Usage: &usageSaved{Up: up, Down: down}}
 	if err := saveConfig(o.cfgPath, cfg); err != nil {
 		return cfg, nil, fmt.Errorf("saving credentials: %w", err)
 	}
@@ -142,28 +132,18 @@ func obtainConfig(o options) (config, *usageCounter, error) {
 	return cfg, usage, nil
 }
 
-// newBackend builds the sink for the configured backend, and the store that keeps its state saved.
-func newBackend(o options, cfg *config, usage *usageCounter, local *http.Client) (sink, *credStore) {
-	if cfg.backend() != "firebase" {
-		return httpSink{c: local, server: cfg.Server, key: cfg.APIKey}, nil
-	}
-	// Keep the connection open between uploads (at least 5 minutes, or twice the upload interval).
-	idle := max(2*o.upload, 5*time.Minute)
-	fc := newFBClient(newCountingClient(usage, idle), cfg.Firebase)
-	fc.compress = o.compress
-	fs := newFBSink(fc, o.upload)
-	fs.usage = usage
-	return fs, newCredStore(o.cfgPath, cfg, usage)
-}
-
-// newRunner enrolls or loads the credentials and wires the backend; the caller then runs its loop.
+// newRunner enrolls or loads the credentials and wires the uploader; the caller then runs its loop.
 func newRunner(o options) (*runner, error) {
 	cfg, usage, err := obtainConfig(o)
 	if err != nil {
 		return nil, err
 	}
 	local := newHTTPClient() // for the local Netdata agent: never counted as upload
-	out, store := newBackend(o, &cfg, usage, local)
-	log.Printf("measuring %s every %s, backend %s", o.netdata, o.interval, cfg.backend())
-	return &runner{client: local, netdata: o.netdata, out: out, store: store, logs: newQuietLog(10 * time.Minute)}, nil
+	// Keep the connection open between uploads (at least 5 minutes, or twice the upload interval).
+	fc := newFBClient(newCountingClient(usage, max(2*o.upload, 5*time.Minute)), cfg.Firebase)
+	fc.compress = o.compress
+	out := newFBSink(fc, o.upload)
+	out.usage = usage
+	log.Printf("measuring %s every %s, uploading every %s", o.netdata, o.interval, o.upload)
+	return &runner{client: local, netdata: o.netdata, out: out, store: newCredStore(o.cfgPath, &cfg, usage), logs: newQuietLog(10 * time.Minute)}, nil
 }

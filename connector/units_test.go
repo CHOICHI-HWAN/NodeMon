@@ -26,13 +26,12 @@ func TestParseOptions(t *testing.T) {
 		{"defaults", nil, ""},
 		{"enroll with firebase", []string{"--code", "AAAA", "--firebase-api-key", "k", "--firebase-db-url", db}, ""},
 		{"enroll against the local emulator over plain http", []string{"--code", "AAAA", "--firebase-api-key", "k", "--firebase-db-url", "http://127.0.0.1:9000?ns=x"}, ""},
-		{"enroll with a self-hosted server on the LAN", []string{"--code", "AAAA", "--server", "http://192.168.0.5:8080"}, ""},
 		{"zero interval would spin", []string{"--interval", "0"}, "--interval must be at least 1s"},
 		{"sub-second interval", []string{"--interval", "500ms"}, "--interval must be at least 1s"},
 		{"upload interval beyond what the rules accept", []string{"--upload-every", "25h"}, "--upload-every must be between"},
 		{"upload interval too small", []string{"--upload-every", "0s"}, "--upload-every must be between"},
-		{"code without a backend", []string{"--code", "AAAA"}, "needs either --server or --firebase-db-url"},
-		{"firebase url without a key", []string{"--code", "AAAA", "--firebase-db-url", db}, "--firebase-api-key is required"},
+		{"code without the Firebase address", []string{"--code", "AAAA"}, "--code needs --firebase-db-url and --firebase-api-key"},
+		{"firebase url without a key", []string{"--code", "AAAA", "--firebase-db-url", db}, "--code needs --firebase-db-url and --firebase-api-key"},
 		{"login token over plain http to another host", []string{"--code", "AAAA", "--firebase-api-key", "k", "--firebase-db-url", "http://db.example.com"}, "must start with https://"},
 		{"not a url", []string{"--code", "AAAA", "--firebase-api-key", "k", "--firebase-db-url", "nonsense"}, "not a valid address"},
 		{"insecure auth override", []string{"--code", "AAAA", "--firebase-api-key", "k", "--firebase-db-url", db, "--firebase-auth-url", "http://auth.example.com"}, "--firebase-auth-url"},
@@ -147,7 +146,7 @@ func TestTrimQueueDropsTheOldestMinutes(t *testing.T) {
 
 func TestCredStoreSavesOnRotationAndOnDemand(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "sub", "connector.json")
-	cfg := &config{Backend: "firebase", Firebase: &fbSaved{RefreshToken: "r1"}}
+	cfg := &config{Firebase: &fbSaved{RefreshToken: "r1"}}
 	usage := newUsageCounter(0, 0)
 	clock := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	s := newCredStore(path, cfg, usage)
@@ -229,5 +228,24 @@ func TestExplainAuthError(t *testing.T) {
 	long := strings.Repeat("x", 1000)
 	if got := explainAuthError("500", long); len(got) > 330 {
 		t.Errorf("unknown errors are shortened, got %d characters", len(got))
+	}
+}
+
+// Credentials written by a build that could also talk to the (now removed) self-hosted server have no Firebase part.
+func TestLoadConfigRejectsCredentialsFromTheRemovedServerBackend(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "connector.json")
+	if err := os.WriteFile(path, []byte(`{"backend":"server","server":"http://nas:8080","api_key":"nmk_x","host_id":3}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := loadConfig(path)
+	if err == nil || !strings.Contains(err.Error(), "register the computer again") {
+		t.Fatalf("expected a clear instruction to register again, got %v", err)
+	}
+	good := filepath.Join(t.TempDir(), "ok.json")
+	if err := saveConfig(good, config{Firebase: &fbSaved{UID: "u"}}); err != nil {
+		t.Fatal(err)
+	}
+	if c, err := loadConfig(good); err != nil || c.Firebase.UID != "u" {
+		t.Fatalf("a Firebase config must load: %+v %v", c, err)
 	}
 }
