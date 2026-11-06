@@ -111,7 +111,7 @@ func TestEmulatorEnrollAndRollup(t *testing.T) {
 
 	push := func(cpu float64) {
 		t.Helper()
-		if err := sink.Push(sample{CPU: cpu, MemUsed: 1, MemTotal: 2, DiskUsed: 1, DiskTotal: 2, Load1: 0.5}); err != nil {
+		if err := sink.Push(sample{CPU: cpu, MemUsed: 1, MemTotal: 2, DiskUsed: 1, DiskTotal: 2, Load1: 0.5, Uptime: 98765}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -131,6 +131,9 @@ func TestEmulatorEnrollAndRollup(t *testing.T) {
 
 	var latest map[string]float64
 	json.Unmarshal(emuDo(t, "GET", "latest/"+saved.UID, ownerTok, nil), &latest)
+	if latest["ut"] != 98765 {
+		t.Fatalf("uptime was not uploaded with the latest value: %v", latest)
+	}
 	if latest["cpu"] != 60 || latest["ts"] < 1e12 {
 		t.Fatalf("latest wrong (ts should be a server timestamp in ms): %v", latest)
 	}

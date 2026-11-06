@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { useMemo, useState } from "react";
 import type { Host } from "./api";
-import { fmtAgo, fmtBytes, fmtPct, fmtRate, pct } from "./format";
+import { fmtAgo, fmtBytes, fmtPct, fmtRate, fmtUptime, pct } from "./format";
 import { Sparkline } from "./Sparkline";
 import { Bar, Status, USAGE_HINT } from "./ui";
 
@@ -28,6 +28,8 @@ export function Nodes({ hosts, now, colors }: { hosts: Host[]; now: number; colo
   }, [hosts, q, filter, sort]);
 
   const live = hosts.filter((h) => h.online).length;
+  const showUsage = hosts.some((h) => h.usage);
+  const showUptime = hosts.some((h) => h.uptime != null);
   const th = (key: SortKey, label: string) => (
     <th aria-sort={sort.key === key ? (sort.dir === 1 ? "ascending" : "descending") : "none"}>
       <button className="th-btn" onClick={() => setSort((s) => ({ key, dir: s.key === key ? (s.dir === 1 ? -1 : 1) : key === "name" ? 1 : -1 }))}>
@@ -67,7 +69,8 @@ export function Nodes({ hosts, now, colors }: { hosts: Host[]; now: number; colo
               {th("mem", "메모리")}
               {th("disk", "디스크")}
               <th>네트워크</th>
-              <th title={USAGE_HINT}>업로드 ⓘ</th>
+              {showUsage && <th title={USAGE_HINT}>업로드 ⓘ</th>}
+              {showUptime && <th title="컴퓨터가 마지막으로 켜진 뒤 지난 시간">가동 시간 ⓘ</th>}
               <th>마지막 수신</th>
             </tr>
           </thead>
@@ -89,6 +92,7 @@ export function Nodes({ hosts, now, colors }: { hosts: Host[]; now: number; colo
                   <td>{l ? <Cell value={pct(l.mem_used, l.mem_total)} label="메모리" /> : "–"}</td>
                   <td>{l ? <Cell value={pct(l.disk_used, l.disk_total)} label="디스크" /> : "–"}</td>
                   <td className="net-cell">{l ? <>↓ {fmtRate(l.net_rx)}<br />↑ {fmtRate(l.net_tx)}</> : "–"}</td>
+                  {showUsage && (
                   <td>
                     {h.usage ? (
                       <div className="usage-cell">
@@ -99,13 +103,15 @@ export function Nodes({ hosts, now, colors }: { hosts: Host[]; now: number; colo
                       "–"
                     )}
                   </td>
+                  )}
+                  {showUptime && <td>{h.uptime != null ? fmtUptime(h.uptime) : "–"}</td>}
                   <td className="muted">{fmtAgo(h.last_seen, now)}</td>
                 </tr>
               );
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={10} className="muted center">조건에 맞는 노드가 없습니다</td>
+                <td colSpan={9 + (showUsage ? 1 : 0) + (showUptime ? 1 : 0)} className="muted center">조건에 맞는 노드가 없습니다</td>
               </tr>
             )}
           </tbody>

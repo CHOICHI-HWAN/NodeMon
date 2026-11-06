@@ -72,6 +72,9 @@ await denied("a non-numeric upload interval is rejected", db(dev, "PUT", `latest
 await ok("latest may carry upload/download totals", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, iv: 180, up: 123456, down: 7890 }));
 await denied("a negative usage total is rejected", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, up: -1 }));
 await denied("a non-numeric usage total is rejected", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, down: "lots" }));
+await ok("latest may carry the computer uptime", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, ut: 86400 }));
+await denied("a negative uptime is rejected", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, ut: -5 }));
+await denied("a non-numeric uptime is rejected", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, ut: "long" }));
 await ok("device writes a minute bucket", db(dev, "PUT", `m/${dev.uid}/20261029/1793280000`, { ...sample, t: 1793280000 }));
 await ok("device writes an hour bucket", db(dev, "PUT", `h/${dev.uid}/202610/1793278800`, { ...sample, t: 1793278800 }));
 await ok("an hour bucket may carry usage totals", db(dev, "PUT", `h/${dev.uid}/202610/1793282400`, { ...sample, t: 1793282400, up: 5000, down: 900 }));

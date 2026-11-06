@@ -27,6 +27,7 @@ type sample struct {
 	NetRx     float64 `json:"net_rx"`
 	NetTx     float64 `json:"net_tx"`
 	Load1     float64 `json:"load1"`
+	Uptime    float64 `json:"uptime"` // seconds since the computer booted; not averaged, only the latest is sent
 }
 
 const (
@@ -125,6 +126,9 @@ func toSample(charts map[string]ndChart) (sample, error) {
 
 	if l, ok := charts["system.load"]; ok {
 		s.Load1, _ = l.dim("load1")
+	}
+	if u, ok := charts["system.uptime"]; ok {
+		s.Uptime, _ = u.dim("uptime")
 	}
 	return s, nil
 }

@@ -236,7 +236,11 @@ func (a *agg) add(s sample) {
 
 func (a *agg) mean() sample {
 	d := float64(a.n)
-	return sample{a.sum.CPU / d, a.sum.MemUsed / d, a.sum.MemTotal / d, a.sum.DiskUsed / d, a.sum.DiskTotal / d, a.sum.NetRx / d, a.sum.NetTx / d, a.sum.Load1 / d}
+	return sample{
+		CPU: a.sum.CPU / d, MemUsed: a.sum.MemUsed / d, MemTotal: a.sum.MemTotal / d,
+		DiskUsed: a.sum.DiskUsed / d, DiskTotal: a.sum.DiskTotal / d,
+		NetRx: a.sum.NetRx / d, NetTx: a.sum.NetTx / d, Load1: a.sum.Load1 / d,
+	}
 }
 
 func round(v float64, places int) float64 {
@@ -326,7 +330,12 @@ func (s *fbSink) flush(now time.Time) error {
 	}
 	// ".sv" asks the database for its own clock, so online detection ignores this computer's clock.
 	// "iv" tells the dashboard how often to expect an upload, so it can tell "quiet" from "offline".
-	update["latest/"+s.f.cfg.UID] = record(s.last, s.usageExtra(map[string]any{"ts": map[string]string{".sv": "timestamp"}, "iv": int(s.uploadEvery.Seconds())}))
+	extra := map[string]any{"ts": map[string]string{".sv": "timestamp"}, "iv": int(s.uploadEvery.Seconds())}
+	if s.last.Uptime > 0 {
+		// The dashboard adds the time since this upload, so the value stays right between uploads.
+		extra["ut"] = int64(s.last.Uptime)
+	}
+	update["latest/"+s.f.cfg.UID] = record(s.last, s.usageExtra(extra))
 	if err := s.send(update); err != nil {
 		s.fails++
 		if len(s.queue) > maxQueued {

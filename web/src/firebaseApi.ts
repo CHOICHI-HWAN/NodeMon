@@ -191,7 +191,7 @@ export const firebaseApi: Api = {
     const nowSec = Math.floor(nowMs / 1000);
     const hosts: Host[] = await Promise.all(
       Object.entries(idx).map(async ([id, d]) => {
-        const latest = (await get(ref(db, `latest/${id}`))).val() as (Record<string, number> & { ts: number; iv?: number; up?: number; down?: number }) | null;
+        const latest = (await get(ref(db, `latest/${id}`))).val() as (Record<string, number> & { ts: number; iv?: number; up?: number; down?: number; ut?: number }) | null;
         const lastSeen = latest ? Math.floor(latest.ts / 1000) : 0;
         const graceMs = Math.max(90_000, (latest?.iv ?? 60) * 2.5 * 1000);
         return {
@@ -200,6 +200,8 @@ export const firebaseApi: Api = {
           name: d.name,
           os: d.os,
           online: latest != null && nowMs - latest.ts < graceMs,
+          // The upload carries the uptime at upload time; add what has passed since, so it is right between uploads.
+          uptime: latest?.ut != null && nowMs - latest.ts < graceMs ? latest.ut + Math.max(0, nowMs - latest.ts) / 1000 : null,
           last_seen: lastSeen,
           latest: latest ? toSample(latest) : null,
           cpu_spark: await spark(id, nowSec),

@@ -37,3 +37,16 @@ export function hostColors(hosts: { id: string; created_at: number }[]): Map<str
     .forEach((h, i) => m.set(h.id, i < 8 ? `var(--series-${i + 1})` : "var(--muted)"));
   return m;
 }
+
+// "3일 4시간", "5시간 12분", "7분": how long a computer has been running since its last boot.
+export function fmtUptime(sec: number): string {
+  const d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600), m = Math.floor((sec % 3600) / 60);
+  if (d > 0) return `${d}일 ${h}시간`;
+  if (h > 0) return `${h}시간 ${m}분`;
+  return m > 0 ? `${m}분` : "1분 미만";
+}
+
+export function fmtDateTime(t: number): string {
+  const d = new Date(t * 1000);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}

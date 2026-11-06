@@ -108,6 +108,7 @@ export function buildRules(emails) {
           ".validate": `newData.hasChildren(['ts', ${FIELDS.map((f) => `'${f}'`).join(", ")}])`,
           ts: { ".validate": "newData.isNumber()" },
           iv: { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 86400" },
+          ut: { ".validate": "newData.isNumber() && newData.val() >= 0" }, // computer uptime in seconds at upload time
           ...Object.fromEntries(FIELDS.map((f) => [f, num])),
           ...USAGE,
           $other: { ".validate": false },

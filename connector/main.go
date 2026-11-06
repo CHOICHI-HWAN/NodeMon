@@ -249,6 +249,7 @@ func step(client *http.Client, out sink, netdata string, persist func(bool)) {
 		log.Printf("netdata: %v", err)
 		return
 	}
+	withUptime(&s)
 	if err := out.Push(s); err != nil {
 		if errors.Is(err, errDenied) {
 			err = errRejected

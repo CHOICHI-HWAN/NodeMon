@@ -21,6 +21,7 @@ export type Host = {
   last_seen: number;
   latest: Sample | null;
   cpu_spark: (number | null)[];
+  uptime?: number | null; // seconds since the computer booted, as of now; null while it is offline or does not report it
   usage?: Usage | null; // data this computer has sent to / received from the database; null if it does not report it
 };
 
