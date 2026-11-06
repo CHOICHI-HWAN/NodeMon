@@ -113,6 +113,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .primary:hover { text-decoration: none; filter: brightness(1.08); }
 .primary.big { display: block; text-align: center; padding: 11px 16px; }
 .danger { background: transparent; border: 1px solid var(--critical); border-radius: 8px; padding: 5px 12px; }
+.danger.small { padding: 2px 8px; font-size: 12px; }
 .danger:hover { background: color-mix(in srgb, var(--critical) 14%, transparent); }
 .link { background: none; border: 0; padding: 2px 4px; color: var(--accent); }
 .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--panel); }
@@ -257,3 +258,5 @@ a.menu-item:hover { background: var(--hover); text-decoration: none; }
 .usage-cell { display: flex; flex-direction: column; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .usage-cell span { font-size: 12px; color: var(--muted); }
 .table-note { margin: 0; font-size: 12px; color: var(--muted); max-width: 90ch; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

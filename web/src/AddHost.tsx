@@ -2,10 +2,9 @@
 import { useEffect, useState } from "react";
 import { api, type EnrollCode } from "./api";
 import {
-  ARCHES, autostartScript, BUILD_LOCAL, checkCommand, downloadCommand, downloadUrl, fileName, guessOs, OS_LABEL, runCommand,
+  ARCHES, autostartScript, BUILD_LOCAL, checkCommand, downloadCommand, downloadUrl, fileName, guessOs, OS_LABEL, RELEASES_URL, REPO_URL, runCommand, zipName,
   type Arch, type Build, type Os,
 } from "./connectorTargets";
-import { DEMO } from "./env";
 
 function Cmd({ label, text }: { label?: string; text: string }) {
   const [copied, setCopied] = useState(false);
@@ -35,8 +34,7 @@ export function AddHost({ onClose }: { onClose: () => void }) {
   const [os, setOs] = useState<Os>(guessOs);
   const [arch, setArch] = useState<Arch>("amd64");
   const [build, setBuild] = useState<Build>("download");
-  const [available, setAvailable] = useState<boolean | null>(null); // is the file really hosted by this site?
-  const origin = DEMO ? "https://your-site.web.app" : window.location.origin;
+  const [name, setName] = useState("");
 
   useEffect(() => {
     api.createCode().then(setCode).catch((e) => setError(String(e)));
@@ -50,20 +48,9 @@ export function AddHost({ onClose }: { onClose: () => void }) {
     setArch(ARCHES[next][0].arch); // default to the first (most common) CPU type of that OS
   };
   const file = fileName(os, arch, build);
-  const args = code?.args ?? "";
-
-  useEffect(() => {
-    if (DEMO) return setAvailable(true);
-    let stop = false;
-    setAvailable(null);
-    fetch(downloadUrl(origin, fileName(os, arch, "download")), { method: "HEAD" })
-      // A server that answers unknown paths with the app's index page would also say 200, so check the type too.
-      .then((r) => !stop && setAvailable(r.ok && !(r.headers.get("content-type") ?? "").includes("text/html")))
-      .catch(() => !stop && setAvailable(false));
-    return () => {
-      stop = true;
-    };
-  }, [os, arch, origin]);
+  // The name goes into a shell command line, so characters that a shell would interpret are dropped.
+  const cleanName = name.replace(/["'`$\\%^&|<>;\r\n]/g, "").trim();
+  const args = code ? `${code.args}${cleanName ? ` --name "${cleanName}"` : ""}` : "";
 
   return (
     <div className="overlay" onClick={onClose}>
@@ -85,7 +72,9 @@ export function AddHost({ onClose }: { onClose: () => void }) {
               Netdata Cloud 연결(claim)은 필요 없습니다. Netdata는 별도로 설치하는 타사 소프트웨어이며 NodeMon과 무관합니다.
             </p>
 
-            <h3 className="step-title">2. 등록할 컴퓨터의 종류 선택</h3>
+            <h3 className="step-title">2. 컴퓨터 이름과 종류 선택</h3>
+            <label htmlFor="pc-name" className="sub">컴퓨터 이름 (대시보드에 표시됩니다. 비워 두면 그 컴퓨터의 호스트 이름을 씁니다)</label>
+            <input id="pc-name" className="search" type="text" maxLength={60} placeholder="예: 사무실 NAS" value={name} onChange={(e) => setName(e.target.value)} />
             <div className="seg" role="group" aria-label="운영체제">
               {(Object.keys(OS_LABEL) as Os[]).map((o) => (
                 <button key={o} className={os === o ? "active" : ""} aria-pressed={os === o} onClick={() => pickOs(o)}>{OS_LABEL[o]}</button>
@@ -115,23 +104,20 @@ export function AddHost({ onClose }: { onClose: () => void }) {
               <button className={build === "local" ? "active" : ""} aria-pressed={build === "local"} onClick={() => setBuild("local")}>직접 빌드</button>
             </div>
             {build === "download" && (
-              available === false ? (
-                <p className="err">
-                  이 사이트에는 <strong className="file">{file}</strong> 파일이 아직 없습니다. 배포한 컴퓨터에 Go가 없었을 수 있습니다.
-                  Go를 설치하고 배포 스크립트를 다시 실행하면 생기고, 그 전에는 “빌드한 파일 복사”나 “직접 빌드”를 쓰세요.
+              <>
+                <p className="sub">
+                  등록할 컴퓨터의 터미널{os === "windows" ? "(PowerShell)" : ""}에서 GitHub 릴리스의 ZIP을 내려받아 풉니다. 풀면 <strong className="file">{file}</strong> 이 생깁니다.
                 </p>
-              ) : (
-                <>
-                  <p className="sub">등록할 컴퓨터의 터미널{os === "windows" ? "(PowerShell)" : ""}에서 내려받습니다. <strong className="file">{file}</strong></p>
-                  <Cmd text={downloadCommand(os, origin, file)} />
-                  <p className="sub">
-                    브라우저로 받으려면 <a href={downloadUrl(origin, file)} download>{file}</a> ·{" "}
-                    <a href={downloadUrl(origin, "SHA256SUMS")} target="_blank" rel="noreferrer">체크섬(SHA256SUMS)</a>으로 파일이 변조되지 않았는지 확인할 수 있습니다.
-                    GPL-3.0-or-later 프로그램이며 <a href="https://github.com/CHOICHI-HWAN/NodeMon" target="_blank" rel="noreferrer">소스 코드</a>를 공개합니다.
-                    {os === "darwin" && " macOS에서는 curl로 받으면 ‘확인되지 않은 개발자’ 경고가 나오지 않습니다."}
-                  </p>
-                </>
-              )
+                <Cmd text={downloadCommand(os, arch)} />
+                <p className="sub">
+                  브라우저로 받으려면 <a href={downloadUrl(zipName(os, arch))}>{zipName(os, arch)}</a> ·{" "}
+                  <a href={downloadUrl("SHA256SUMS")}>체크섬(SHA256SUMS)</a>으로 변조 여부를 확인할 수 있습니다 ·{" "}
+                  <a href={RELEASES_URL} target="_blank" rel="noreferrer">모든 릴리스</a>.
+                  GPL-3.0-or-later 프로그램이며 <a href={REPO_URL} target="_blank" rel="noreferrer">소스 코드</a>를 공개합니다.
+                  {os === "darwin" && " macOS에서는 curl로 받으면 ‘확인되지 않은 개발자’ 경고가 나오지 않습니다."}
+                </p>
+                <p className="sub">링크가 404이면 아직 릴리스가 없는 것입니다. 저장소 관리자가 <code>v0.1.0</code> 같은 태그를 올리면 자동으로 만들어집니다. 그 전에는 “직접 빌드”를 쓰세요.</p>
+              </>
             )}
             {build === "dist" && (
               <p className="sub">
@@ -148,7 +134,10 @@ export function AddHost({ onClose }: { onClose: () => void }) {
             )}
 
             <h3 className="step-title">4. 등록 (한 번만 실행)</h3>
-            <p className="sub">파일이 있는 폴더의 터미널{os === "windows" ? "(PowerShell)" : ""}에서 실행합니다.</p>
+            <p className="sub">
+              파일이 있는 폴더의 터미널{os === "windows" ? "(PowerShell)" : ""}에서 실행합니다. 등록 코드{cleanName ? " 와 컴퓨터 이름" : ""}이 명령에 이미 들어 있습니다.
+              {!cleanName && " 이름을 정하지 않아 그 컴퓨터의 호스트 이름으로 표시됩니다."}
+            </p>
             <Cmd text={runCommand(os, file, args)} />
             <p className="sub">
               <code>enrolled</code>가 나오면 등록 성공이고, 이 화면의 <strong>노드</strong>에 곧 나타납니다. 이후에도 실행이 계속되므로 시험이 끝나면 <code>Ctrl+C</code>로 멈추세요.

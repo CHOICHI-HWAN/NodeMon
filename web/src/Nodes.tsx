@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { useMemo, useState } from "react";
-import type { Host } from "./api";
+import { api, type Host } from "./api";
+import { DEMO } from "./env";
 import { fmtAgo, fmtBytes, fmtPct, fmtRate, fmtUptime, pct } from "./format";
 import { Sparkline } from "./Sparkline";
 import { Bar, Status, USAGE_HINT } from "./ui";
@@ -11,7 +12,18 @@ type Filter = "all" | "live" | "offline";
 const val = (h: Host, k: SortKey) =>
   k === "name" ? h.name.toLowerCase() : !h.latest ? -1 : k === "cpu" ? h.latest.cpu : k === "mem" ? pct(h.latest.mem_used, h.latest.mem_total) : pct(h.latest.disk_used, h.latest.disk_total);
 
-export function Nodes({ hosts, now, colors }: { hosts: Host[]; now: number; colors: Map<string, string> }) {
+export function Nodes({ hosts, now, colors, onDeleted }: { hosts: Host[]; now: number; colors: Map<string, string>; onDeleted: (id: string) => void }) {
+  const [error, setError] = useState<string | null>(null);
+  const remove = async (h: Host) => {
+    if (!window.confirm(`'${h.name}' 을(를) 삭제할까요? 수집된 데이터도 함께 삭제됩니다.`)) return;
+    setError(null);
+    try {
+      await api.deleteHost(h.id);
+      onDeleted(h.id);
+    } catch (e) {
+      setError(`삭제하지 못했습니다: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "name", dir: 1 });
@@ -57,6 +69,7 @@ export function Nodes({ hosts, now, colors }: { hosts: Host[]; now: number; colo
           ))}
         </div>
       </div>
+      {error && <p className="err">{error}</p>}
       <div className="table-card">
         <table className="nodes">
           <thead>
@@ -72,6 +85,7 @@ export function Nodes({ hosts, now, colors }: { hosts: Host[]; now: number; colo
               {showUsage && <th title={USAGE_HINT}>업로드 ⓘ</th>}
               {showUptime && <th title="컴퓨터가 마지막으로 켜진 뒤 지난 시간">가동 시간 ⓘ</th>}
               <th>마지막 수신</th>
+              {!DEMO && <th><span className="sr-only">삭제</span></th>}
             </tr>
           </thead>
           <tbody>
@@ -106,12 +120,13 @@ export function Nodes({ hosts, now, colors }: { hosts: Host[]; now: number; colo
                   )}
                   {showUptime && <td>{h.uptime != null ? fmtUptime(h.uptime) : "–"}</td>}
                   <td className="muted">{fmtAgo(h.last_seen, now)}</td>
+                  {!DEMO && <td><button className="danger small" onClick={() => remove(h)} aria-label={`${h.name} 삭제`}>삭제</button></td>}
                 </tr>
               );
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={9 + (showUsage ? 1 : 0) + (showUptime ? 1 : 0)} className="muted center">조건에 맞는 노드가 없습니다</td>
+                <td colSpan={9 + (DEMO ? 0 : 1) + (showUsage ? 1 : 0) + (showUptime ? 1 : 0)} className="muted center">조건에 맞는 노드가 없습니다</td>
               </tr>
             )}
           </tbody>

@@ -48,8 +48,10 @@ function Dashboard({ user }: { user: User }) {
   // Normal polling is slow to save data; right after adding a computer (or with none yet) check often.
   const fast = watching || hostCount === 0;
   const { data, error } = usePoll(() => api.overview(), [mode], paused ? 0 : fast ? 5000 : OVERVIEW_POLL_MS);
-  const hosts = data?.hosts ?? [];
-  useEffect(() => setHostCount(data ? data.hosts.length : -1), [data]);
+  const [gone, setGone] = useState<ReadonlySet<string>>(new Set()); // deleted just now; the next refresh no longer lists them
+  const hosts = useMemo(() => (data?.hosts ?? []).filter((h) => !gone.has(h.id)), [data, gone]);
+  const forget = useCallback((id: string) => setGone((g) => new Set(g).add(id)), []);
+  useEffect(() => setHostCount(data ? hosts.length : -1), [data, hosts]);
   const openAdd = () => {
     setAdding(true);
     setWatching(true);
@@ -122,9 +124,9 @@ function Dashboard({ user }: { user: User }) {
             (page === "overview" ? (
               <Overview hosts={hosts} now={now} colors={colors} range={range} paused={paused} onAdd={openAdd} />
             ) : page === "nodes" ? (
-              <Nodes hosts={hosts} now={now} colors={colors} />
+              <Nodes hosts={hosts} now={now} colors={colors} onDeleted={forget} />
             ) : (
-              <HostDetail host={host} color={colors.get(host?.id ?? "") ?? "var(--series-1)"} now={now} range={range} paused={paused} onDeleted={() => navigate("#/nodes")} />
+              <HostDetail host={host} color={colors.get(host?.id ?? "") ?? "var(--series-1)"} now={now} range={range} paused={paused} onDeleted={() => { forget(host!.id); navigate("#/nodes"); }} />
             ))}
         </main>
       </div>

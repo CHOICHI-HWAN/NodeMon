@@ -2,14 +2,16 @@
 
 Connector는 Netdata가 설치된 컴퓨터마다 하나씩 실행합니다. 대시보드의 **컴퓨터 추가** 창에서 OS와 CPU 종류를 고르면 아래 내용이 그대로 나옵니다.
 
-**가장 쉬운 방법: 대시보드에서 바로 내려받기.** `node firebase/deploy.mjs`로 배포하면 Connector 실행 파일도 함께 빌드되어 대시보드 사이트(`https://<사이트>.web.app/downloads/`)에 올라갑니다. 컴퓨터 추가 창의 "바로 다운로드"가 등록할 컴퓨터의 터미널에서 실행할 명령을 만들어 줍니다. 예:
+**가장 쉬운 방법: GitHub 릴리스의 ZIP.** 컴퓨터 종류마다 ZIP이 하나씩 있고(프로그램 + 라이선스 + 서드파티 고지), 컴퓨터 추가 창의 "바로 다운로드"가 등록할 컴퓨터의 터미널에서 실행할 명령을 만들어 줍니다. 항상 최신 릴리스를 가리킵니다.
 ```
-curl -fLO https://comon.web.app/downloads/nodemon-connector-linux-amd64                     # Linux, macOS
-Invoke-WebRequest https://comon.web.app/downloads/nodemon-connector-windows-amd64.exe -OutFile nodemon-connector-windows-amd64.exe   # Windows PowerShell
+curl -fLO https://github.com/CHOICHI-HWAN/NodeMon/releases/latest/download/nodemon-connector-linux-amd64.zip && unzip -o nodemon-connector-linux-amd64.zip     # Linux, macOS
+Invoke-WebRequest https://github.com/CHOICHI-HWAN/NodeMon/releases/latest/download/nodemon-connector-windows-amd64.zip -OutFile nodemon-connector-windows-amd64.zip; Expand-Archive nodemon-connector-windows-amd64.zip -DestinationPath . -Force   # Windows PowerShell
 ```
-`SHA256SUMS`(같은 폴더)로 변조 여부를 확인할 수 있습니다: `curl -fsSL https://comon.web.app/downloads/SHA256SUMS | grep <파일이름> | sha256sum -c -` (macOS는 `shasum -a 256 -c -`). 배포하는 컴퓨터에 **Go가 없으면** 새로 빌드하지 못하고, 이전에 만들어 둔 `dist/`의 파일이 있으면 그것을, 없으면 다운로드 파일 없이 배포합니다(대시보드는 정상). Go 설치 후 다시 배포하면 생깁니다.
+ZIP 이름은 `nodemon-connector-<linux|darwin|windows>-<amd64|arm64|arm>.zip`이고, 풀면 `nodemon-connector-<os>-<cpu>`(Windows는 `.exe`)가 나옵니다. 같은 주소의 `SHA256SUMS`로 변조 여부를 확인할 수 있습니다: `curl -fsSL https://github.com/CHOICHI-HWAN/NodeMon/releases/latest/download/SHA256SUMS | grep <ZIP이름> | sha256sum -c -` (macOS는 `shasum -a 256 -c -`).
 
-다운로드를 쓰지 않을 때는 아래 방법으로 직접 만들 수 있습니다.
+릴리스는 저장소에 `v0.1.0` 같은 태그를 올리면 GitHub Actions(`.github/workflows/release.yml`)가 모든 종류를 빌드해 만듭니다: `git tag -a v0.1.0 -m "NodeMon v0.1.0" && git push origin v0.1.0`. 릴리스가 아직 없으면 위 링크는 404입니다. 대시보드 배포(`firebase/deploy.mjs`)는 Go가 필요 없습니다.
+
+ZIP을 쓰지 않을 때는 아래 방법으로 직접 만들 수 있습니다.
 
 **1. 파일 만들기** (Go 1.24 이상이 있는 아무 컴퓨터 한 대에서. `node scripts/build-connector.mjs`도 같은 일을 하며 체크섬 파일까지 만듭니다)
 ```

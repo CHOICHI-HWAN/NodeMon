@@ -43,7 +43,7 @@ node firebase/deploy.mjs --emails 내계정@gmail.com
 git pull
 node firebase/deploy.mjs --yes
 ```
-보안 규칙과 대시보드, Connector 다운로드 파일이 모두 갱신됩니다. 이미 등록된 컴퓨터의 Connector는 자동으로 바뀌지 않으니, 새 기능이 필요하면 그 컴퓨터에서 새 파일을 내려받아 교체하세요(등록 정보는 그대로 유지됩니다).
+보안 규칙과 대시보드가 갱신됩니다(Connector 파일은 GitHub 릴리스에 있어 배포와 무관합니다). 이미 등록된 컴퓨터의 Connector는 자동으로 바뀌지 않으니, 새 기능이 필요하면 그 컴퓨터에서 새 파일을 내려받아 교체하세요(등록 정보는 그대로 유지됩니다).
 
 
 ## 처음 시험할 때 확인할 것

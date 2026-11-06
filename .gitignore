@@ -9,6 +9,6 @@ firebase/database.rules.json
 .firebaserc
 web/.env.*.local
 firebase/.allowed-emails
-web/public/downloads/
 web/dist-*/
 *-debug.log
+web/public/downloads/
