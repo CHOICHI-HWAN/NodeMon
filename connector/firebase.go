@@ -272,6 +272,7 @@ type fbSink struct {
 	last        sample
 	queue       map[string]any // finished buckets not yet uploaded, keyed by database path
 	noBatch     bool           // set if the database refuses multi-path updates; we then write path by path
+	usage       *usageCounter  // when set, running totals are uploaded with the latest value and hour buckets
 	lastAttempt time.Time
 	fails       int // consecutive failed uploads; drives the back-off
 	lastPruned  time.Time
@@ -307,6 +308,15 @@ func (s *fbSink) wait() time.Duration {
 	return w
 }
 
+// usageExtra adds the running upload/download totals (bytes) to a record when counting is on.
+func (s *fbSink) usageExtra(extra map[string]any) map[string]any {
+	if s.usage != nil {
+		up, down := s.usage.snapshot()
+		extra["up"], extra["down"] = up, down
+	}
+	return extra
+}
+
 // flush sends the queued buckets plus the latest value as a single multi-path update.
 func (s *fbSink) flush(now time.Time) error {
 	s.lastAttempt = now
@@ -316,7 +326,7 @@ func (s *fbSink) flush(now time.Time) error {
 	}
 	// ".sv" asks the database for its own clock, so online detection ignores this computer's clock.
 	// "iv" tells the dashboard how often to expect an upload, so it can tell "quiet" from "offline".
-	update["latest/"+s.f.cfg.UID] = record(s.last, map[string]any{"ts": map[string]string{".sv": "timestamp"}, "iv": int(s.uploadEvery.Seconds())})
+	update["latest/"+s.f.cfg.UID] = record(s.last, s.usageExtra(map[string]any{"ts": map[string]string{".sv": "timestamp"}, "iv": int(s.uploadEvery.Seconds())}))
 	if err := s.send(update); err != nil {
 		s.fails++
 		if len(s.queue) > maxQueued {
@@ -363,7 +373,7 @@ func (s *fbSink) rollover(now time.Time) {
 		if hour := minute.Truncate(time.Hour); !hour.Equal(s.hourStart) {
 			start, havg := s.hourStart, s.hour.mean()
 			s.hour, s.hourStart = agg{}, time.Time{}
-			s.queue[fmt.Sprintf("h/%s/%s/%d", uid, start.Format("200601"), start.Unix())] = record(havg, map[string]any{"t": start.Unix()})
+			s.queue[fmt.Sprintf("h/%s/%s/%d", uid, start.Format("200601"), start.Unix())] = record(havg, s.usageExtra(map[string]any{"t": start.Unix()}))
 		}
 	}
 	if s.min.n == 0 || !minute.Equal(s.minStart) {

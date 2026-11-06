@@ -5,7 +5,7 @@ import { fmtAgo, fmtBytes, fmtPct, fmtRate, pct } from "./format";
 import { HoverProvider } from "./hover";
 import { usePoll } from "./hooks";
 import { LineChart } from "./LineChart";
-import { Section, Status, Tile } from "./ui";
+import { Section, Status, Tile, USAGE_HINT } from "./ui";
 
 type Props = {
   host: Host | undefined;
@@ -58,6 +58,14 @@ export function HostDetail({ host, color, now, range, paused, onDeleted }: Props
           <Tile label="메모리" value={fmtPct(pct(l.mem_used, l.mem_total))} bar={pct(l.mem_used, l.mem_total)} sub={`${fmtBytes(l.mem_used)} / ${fmtBytes(l.mem_total)}`} />
           <Tile label="디스크" value={fmtPct(pct(l.disk_used, l.disk_total))} bar={pct(l.disk_used, l.disk_total)} sub={`${fmtBytes(l.disk_used)} / ${fmtBytes(l.disk_total)}`} />
           <Tile label="네트워크" value={<span className="net-val">↓ {fmtRate(l.net_rx)}</span>} sub={`↑ ${fmtRate(l.net_tx)}`} />
+          {host.usage && (
+            <Tile
+              label="업로드 총량"
+              hint={USAGE_HINT}
+              value={<span className="net-val">{fmtBytes(host.usage.up)}</span>}
+              sub={`${host.usage.up24h != null ? `24시간 ${fmtBytes(host.usage.up24h)} · ` : ""}받음 ${fmtBytes(host.usage.down)}`}
+            />
+          )}
         </div>
       )}
       <Section title="시스템">

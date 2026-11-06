@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 
 const FIELDS = ["cpu", "mem_used", "mem_total", "disk_used", "disk_total", "net_rx", "net_tx", "load1"];
 const num = { ".validate": "newData.isNumber() && newData.val() >= 0" };
+// Optional running totals of bytes the connector has sent to / received from the database.
+const USAGE = { up: num, down: num };
 
 export function buildRules(emails) {
   if (!emails.length) throw new Error("at least one allowed email is required");
@@ -25,6 +27,7 @@ export function buildRules(emails) {
     ".validate": `newData.hasChildren(['${timeKey}', ${FIELDS.map((f) => `'${f}'`).join(", ")}])`,
     [timeKey]: { ".validate": "newData.isNumber()" },
     ...Object.fromEntries(FIELDS.map((f) => [f, num])),
+    ...USAGE,
     $other: { ".validate": false },
   });
 
@@ -106,6 +109,7 @@ export function buildRules(emails) {
           ts: { ".validate": "newData.isNumber()" },
           iv: { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 86400" },
           ...Object.fromEntries(FIELDS.map((f) => [f, num])),
+          ...USAGE,
           $other: { ".validate": false },
         },
       },

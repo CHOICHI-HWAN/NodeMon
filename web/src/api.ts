@@ -21,9 +21,13 @@ export type Host = {
   last_seen: number;
   latest: Sample | null;
   cpu_spark: (number | null)[];
+  usage?: Usage | null; // data this computer has sent to / received from the database; null if it does not report it
 };
 
-export type Point = Sample & { t: number };
+// Bytes, counted by the connector at the network socket: includes encryption and protocol overhead.
+export type Usage = { up: number; down: number; up24h: number | null };
+
+export type Point = Sample & { t: number; up?: number; down?: number };
 export type User = { id: number; email: string; name: string };
 // args: the connector command-line arguments that enroll a computer with this code.
 export type EnrollCode = { code: string; expires_at: number; args: string };

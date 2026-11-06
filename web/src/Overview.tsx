@@ -5,7 +5,7 @@ import { HoverProvider } from "./hover";
 import { usePoll } from "./hooks";
 import { LineChart } from "./LineChart";
 import { mergeHosts } from "./merge";
-import { Section, Tile } from "./ui";
+import { Section, Tile, USAGE_HINT } from "./ui";
 
 type Props = {
   hosts: Host[];
@@ -44,6 +44,10 @@ export function Overview({ hosts, now, colors, range, paused, onAdd }: Props) {
   const memUsed = sum((h) => h.latest!.mem_used), memTotal = sum((h) => h.latest!.mem_total);
   const diskUsed = sum((h) => h.latest!.disk_used), diskTotal = sum((h) => h.latest!.disk_total);
   const offline = hosts.length - hosts.filter((h) => h.online).length;
+  const reporting = hosts.filter((h) => h.usage);
+  const upTotal = reporting.reduce((t, h) => t + h.usage!.up, 0);
+  const downTotal = reporting.reduce((t, h) => t + h.usage!.down, 0);
+  const up24 = reporting.every((h) => h.usage!.up24h != null) ? reporting.reduce((t, h) => t + (h.usage!.up24h as number), 0) : null;
 
   const refs = hosts.map((h) => ({ id: h.id, name: h.name, color: colors.get(h.id) as string }));
   const map = data?.map ?? new Map<string, Point[]>();
@@ -60,6 +64,14 @@ export function Overview({ hosts, now, colors, range, paused, onAdd }: Props) {
         <Tile label="메모리" value={fmtPct(pct(memUsed, memTotal))} bar={pct(memUsed, memTotal)} sub={`${fmtBytes(memUsed)} / ${fmtBytes(memTotal)}`} />
         <Tile label="디스크" value={fmtPct(pct(diskUsed, diskTotal))} bar={pct(diskUsed, diskTotal)} sub={`${fmtBytes(diskUsed)} / ${fmtBytes(diskTotal)}`} />
         <Tile label="네트워크" value={<span className="net-val">↓ {fmtRate(sum((h) => h.latest!.net_rx))}</span>} sub={`↑ ${fmtRate(sum((h) => h.latest!.net_tx))}`} />
+        {reporting.length > 0 && (
+          <Tile
+            label="업로드 총량"
+            hint={USAGE_HINT}
+            value={<span className="net-val">{fmtBytes(upTotal)}</span>}
+            sub={`${up24 != null ? `24시간 ${fmtBytes(up24)} · ` : ""}받음 ${fmtBytes(downTotal)}`}
+          />
+        )}
       </div>
       <Section title="시스템 개요" hint={one ? "노드 1대" : `노드 ${hosts.length}대 비교`}>
         <div className="grid charts">

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { useMemo, useState } from "react";
 import type { Host } from "./api";
-import { fmtAgo, fmtPct, fmtRate, pct } from "./format";
+import { fmtAgo, fmtBytes, fmtPct, fmtRate, pct } from "./format";
 import { Sparkline } from "./Sparkline";
-import { Bar, Status } from "./ui";
+import { Bar, Status, USAGE_HINT } from "./ui";
 
 type SortKey = "name" | "cpu" | "mem" | "disk";
 type Filter = "all" | "live" | "offline";
@@ -67,6 +67,7 @@ export function Nodes({ hosts, now, colors }: { hosts: Host[]; now: number; colo
               {th("mem", "메모리")}
               {th("disk", "디스크")}
               <th>네트워크</th>
+              <th title={USAGE_HINT}>업로드 ⓘ</th>
               <th>마지막 수신</th>
             </tr>
           </thead>
@@ -88,18 +89,29 @@ export function Nodes({ hosts, now, colors }: { hosts: Host[]; now: number; colo
                   <td>{l ? <Cell value={pct(l.mem_used, l.mem_total)} label="메모리" /> : "–"}</td>
                   <td>{l ? <Cell value={pct(l.disk_used, l.disk_total)} label="디스크" /> : "–"}</td>
                   <td className="net-cell">{l ? <>↓ {fmtRate(l.net_rx)}<br />↑ {fmtRate(l.net_tx)}</> : "–"}</td>
+                  <td>
+                    {h.usage ? (
+                      <div className="usage-cell">
+                        <strong>{fmtBytes(h.usage.up)}</strong>
+                        <span>24시간 {h.usage.up24h != null ? fmtBytes(h.usage.up24h) : "–"}</span>
+                      </div>
+                    ) : (
+                      "–"
+                    )}
+                  </td>
                   <td className="muted">{fmtAgo(h.last_seen, now)}</td>
                 </tr>
               );
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={9} className="muted center">조건에 맞는 노드가 없습니다</td>
+                <td colSpan={10} className="muted center">조건에 맞는 노드가 없습니다</td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+      {hosts.some((h) => h.usage) && <p className="table-note">업로드: {USAGE_HINT}</p>}
     </>
   );
 }

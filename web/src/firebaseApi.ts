@@ -88,7 +88,7 @@ async function readBuckets(kind: "m" | "h", id: string, from: number, to: number
   }
   const snaps = await Promise.all(keys.map((k) => get(query(ref(db, `${kind}/${id}/${k}`), orderByKey(), startAt(String(from))))));
   const out: Point[] = [];
-  for (const s of snaps) s.forEach((c) => { out.push({ ...toSample(c.val()), t: c.val().t }); });
+  for (const s of snaps) s.forEach((c) => { out.push({ ...toSample(c.val()), t: c.val().t, up: c.val().up, down: c.val().down }); });
   return out.sort((a, b) => a.t - b.t);
 }
 
@@ -143,6 +143,26 @@ async function spark(id: string, nowSec: number): Promise<(number | null)[]> {
   return values;
 }
 
+// Upload in the last 24 hours = running total now minus the total recorded in the hour bucket a day ago.
+// Hour buckets are immutable and cached, so only that baseline is looked up (at most every 10 minutes);
+// the subtraction uses the fresh total every time.
+const usageBase = new Map<string, { at: number; base: number | null }>();
+async function upLast24h(id: string, total: number, createdAtMs: number | undefined, nowSec: number): Promise<number | null> {
+  let hit = usageBase.get(id);
+  if (!hit || nowSec - hit.at >= 600) {
+    const dayAgo = nowSec - 86400;
+    const pts = await readCached("h", id, dayAgo - 3 * 3600, nowSec);
+    // A bucket's totals were taken at its end, one hour after its start time.
+    const bucket = [...pts].reverse().find((p) => p.t + 3600 <= dayAgo && p.up != null);
+    let base: number | null = null;
+    if (bucket?.up != null) base = bucket.up;
+    else if (createdAtMs && createdAtMs / 1000 > dayAgo - 3600) base = 0; // registered within the last day: everything counts
+    hit = { at: nowSec, base };
+    usageBase.set(id, hit);
+  }
+  return hit.base == null ? null : Math.max(0, total - hit.base);
+}
+
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 export const firebaseApi: Api = {
@@ -171,7 +191,7 @@ export const firebaseApi: Api = {
     const nowSec = Math.floor(nowMs / 1000);
     const hosts: Host[] = await Promise.all(
       Object.entries(idx).map(async ([id, d]) => {
-        const latest = (await get(ref(db, `latest/${id}`))).val() as (Record<string, number> & { ts: number; iv?: number }) | null;
+        const latest = (await get(ref(db, `latest/${id}`))).val() as (Record<string, number> & { ts: number; iv?: number; up?: number; down?: number }) | null;
         const lastSeen = latest ? Math.floor(latest.ts / 1000) : 0;
         const graceMs = Math.max(90_000, (latest?.iv ?? 60) * 2.5 * 1000);
         return {
@@ -183,6 +203,7 @@ export const firebaseApi: Api = {
           last_seen: lastSeen,
           latest: latest ? toSample(latest) : null,
           cpu_spark: await spark(id, nowSec),
+          usage: latest?.up != null ? { up: latest.up, down: latest.down ?? 0, up24h: await upLast24h(id, latest.up, d.createdAt, nowSec) } : null,
         };
       }),
     );

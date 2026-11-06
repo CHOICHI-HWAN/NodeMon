@@ -12,9 +12,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 )
 
@@ -25,6 +28,13 @@ type config struct {
 	APIKey   string   `json:"api_key,omitempty"`
 	HostID   int64    `json:"host_id,omitempty"`
 	Firebase *fbSaved `json:"firebase,omitempty"`
+	// Usage is the running total of bytes sent to and received from Firebase since this computer was registered.
+	Usage *usageSaved `json:"usage,omitempty"`
+}
+
+type usageSaved struct {
+	Up   int64 `json:"up"`
+	Down int64 `json:"down"`
 }
 
 func (c config) backend() string {
@@ -144,7 +154,8 @@ func main() {
 		flag.PrintDefaults()
 	}
 	flag.Parse()
-	client := newHTTPClient()
+	client := newHTTPClient() // for the local Netdata agent: never counted as upload
+	usage := newUsageCounter(0, 0)
 
 	cfg, loadErr := loadConfig(*cfgPath)
 	if *code != "" {
@@ -155,8 +166,9 @@ func main() {
 				log.Fatal("--firebase-api-key is required together with --firebase-db-url")
 			}
 			var saved *fbSaved
-			saved, err = enrollFirebase(client, fbSaved{APIKey: *fbKey, DatabaseURL: *fbDB, AuthURL: *fbAuthURL, TokenURL: *fbTokURL}, *code, *name, runtime.GOOS)
-			cfg = config{Backend: "firebase", Firebase: saved}
+			saved, err = enrollFirebase(newCountingClient(usage), fbSaved{APIKey: *fbKey, DatabaseURL: *fbDB, AuthURL: *fbAuthURL, TokenURL: *fbTokURL}, *code, *name, runtime.GOOS)
+			up, down := usage.snapshot()
+			cfg = config{Backend: "firebase", Firebase: saved, Usage: &usageSaved{Up: up, Down: down}}
 		case *server != "":
 			cfg, err = enrollServer(client, strings.TrimRight(*server, "/"), *code, *name)
 		default:
@@ -171,21 +183,31 @@ func main() {
 		log.Printf("enrolled; credentials saved to %s", *cfgPath)
 	} else if loadErr != nil {
 		log.Fatalf("no credentials at %s (run once with --code): %v", *cfgPath, loadErr)
+	} else if cfg.Usage != nil {
+		usage = newUsageCounter(cfg.Usage.Up, cfg.Usage.Down) // carry the total across restarts
 	}
 
 	var out sink
-	var persist func()
+	var persist func(force bool)
 	switch cfg.backend() {
 	case "firebase":
-		fc := newFBClient(client, cfg.Firebase)
-		out = newFBSink(fc, *upload)
-		// Firebase may rotate the refresh token; keep the saved copy current.
+		fc := newFBClient(newCountingClient(usage), cfg.Firebase)
+		fs := newFBSink(fc, *upload)
+		fs.usage = usage
+		out = fs
+		// Firebase may rotate the refresh token, and the usage total grows; keep the saved copy current,
+		// but write the file at most once a minute.
 		last := cfg.Firebase.RefreshToken
-		persist = func() {
-			if cfg.Firebase.RefreshToken != last {
+		lastWrite := time.Now()
+		persist = func(force bool) {
+			up, down := usage.snapshot()
+			grew := cfg.Usage == nil || up != cfg.Usage.Up || down != cfg.Usage.Down
+			if cfg.Firebase.RefreshToken != last || (grew && (force || time.Since(lastWrite) >= time.Minute)) {
 				last = cfg.Firebase.RefreshToken
+				cfg.Usage = &usageSaved{Up: up, Down: down}
+				lastWrite = time.Now()
 				if err := saveConfig(*cfgPath, cfg); err != nil {
-					log.Printf("saving refreshed credentials: %v", err)
+					log.Printf("saving credentials: %v", err)
 				}
 			}
 		}
@@ -194,25 +216,46 @@ func main() {
 	}
 
 	log.Printf("measuring %s every %s, backend %s", *netdata, *interval, cfg.backend())
+
+	// On Ctrl+C or a service stop, save the running usage total first so a restart does not lose it.
+	var mu sync.Mutex // held while a measurement/upload is in flight, so we never write the file mid-request
+	if persist != nil {
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+		go func() {
+			<-sigs
+			mu.Lock()
+			persist(true)
+			os.Exit(0)
+		}()
+	}
+
 	for ; ; time.Sleep(*interval) {
-		charts, err := fetchNetdata(client, *netdata)
-		if err != nil {
-			log.Printf("netdata: %v", err)
-			continue
+		mu.Lock()
+		step(client, out, *netdata, persist)
+		mu.Unlock()
+	}
+}
+
+// step takes one measurement, hands it to the sink and keeps the saved credentials current.
+func step(client *http.Client, out sink, netdata string, persist func(bool)) {
+	charts, err := fetchNetdata(client, netdata)
+	if err != nil {
+		log.Printf("netdata: %v", err)
+		return
+	}
+	s, err := toSample(charts)
+	if err != nil {
+		log.Printf("netdata: %v", err)
+		return
+	}
+	if err := out.Push(s); err != nil {
+		if errors.Is(err, errDenied) {
+			err = errRejected
 		}
-		s, err := toSample(charts)
-		if err != nil {
-			log.Printf("netdata: %v", err)
-			continue
-		}
-		if err := out.Push(s); err != nil {
-			if errors.Is(err, errDenied) {
-				err = errRejected
-			}
-			log.Printf("send: %v", err)
-		}
-		if persist != nil {
-			persist()
-		}
+		log.Printf("send: %v", err)
+	}
+	if persist != nil {
+		persist(false)
 	}
 }

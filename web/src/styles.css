@@ -189,7 +189,7 @@ th { position: sticky; top: 0; background: var(--panel); color: var(--ink-2); fo
 .filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .search { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; min-width: 220px; }
 .table-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow-x: auto; }
-table.nodes { font-size: 13px; min-width: 860px; }
+table.nodes { font-size: 13px; min-width: 980px; }
 table.nodes th, table.nodes td { padding: 10px 12px; vertical-align: middle; border-bottom: 1px solid var(--border); }
 table.nodes thead th { position: static; background: var(--sidebar); font-size: 12px; white-space: nowrap; }
 table.nodes tbody tr:last-child td { border-bottom: 0; }
@@ -255,3 +255,6 @@ a.menu-item:hover { background: var(--hover); text-decoration: none; }
 .sub code { font-size: 12px; background: var(--page); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
 .modal > * { flex-shrink: 0; }
 .cmd-box code { white-space: pre-wrap; word-break: break-all; overflow-x: visible; }
+.usage-cell { display: flex; flex-direction: column; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.usage-cell span { font-size: 12px; color: var(--muted); }
+.table-note { margin: 0; font-size: 12px; color: var(--muted); max-width: 90ch; }

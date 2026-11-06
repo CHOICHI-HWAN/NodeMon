@@ -95,11 +95,13 @@ func TestEmulatorEnrollAndRollup(t *testing.T) {
 	}
 
 	// Drive the sink with a fake clock so minute/hour boundaries and token refresh are exercised.
-	fc := newFBClient(newHTTPClient(), saved)
+	usage := newUsageCounter(0, 0)
+	fc := newFBClient(newCountingClient(usage), saved)
 	base := time.Now().UTC().Truncate(time.Hour).Add(-3 * time.Hour)
 	clock := base.Add(10 * time.Minute)
 	fc.now = func() time.Time { return clock }
 	sink := newFBSink(fc, time.Minute)
+	sink.usage = usage
 
 	// A bucket far past retention should be pruned on the first push.
 	emuStale := map[string]any{"t": 1577836800, "cpu": 1, "mem_used": 1, "mem_total": 1, "disk_used": 1, "disk_total": 1, "net_rx": 0, "net_tx": 0, "load1": 0}
@@ -144,6 +146,12 @@ func TestEmulatorEnrollAndRollup(t *testing.T) {
 	json.Unmarshal(emuDo(t, "GET", hourKey, ownerTok, nil), &h)
 	if h["cpu"] != 35 || h["t"] != float64(base.Unix()) {
 		t.Fatalf("hour bucket wrong: %v", h)
+	}
+	if latest["up"] <= 0 || latest["down"] <= 0 || h["up"] <= 0 {
+		t.Fatalf("usage totals missing: latest=%v hour=%v", latest, h)
+	}
+	if up, _ := usage.snapshot(); latest["up"] > float64(up) {
+		t.Fatalf("the uploaded total (%v) cannot exceed what was really sent (%d)", latest["up"], up)
 	}
 	if string(emuDo(t, "GET", "m/"+saved.UID+"/20200101", ownerTok, nil)) != "null" {
 		t.Fatal("stale bucket was not pruned")
@@ -302,5 +310,35 @@ func TestRejectedDeviceBacksOff(t *testing.T) {
 	t.Logf("rejected device: %d requests in one hour", requests)
 	if requests > 60 {
 		t.Fatalf("a rejected device sent %d requests in an hour; back-off is not working", requests)
+	}
+}
+
+// The counter must see real socket bytes: at least the request body going up, and the response coming down.
+func TestCountingClientCountsSocketBytes(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.Copy(io.Discard, r.Body)
+		w.Write(make([]byte, 5000))
+	}))
+	defer srv.Close()
+	u := newUsageCounter(0, 0)
+	body := strings.NewReader(strings.Repeat("x", 3000))
+	resp, err := newCountingClient(u).Post(srv.URL, "text/plain", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+	up, down := u.snapshot()
+	if up < 3000 || up > 3000+1500 { // body plus request line and headers
+		t.Fatalf("up = %d, want about 3000 plus headers", up)
+	}
+	if down < 5000 || down > 5000+1500 {
+		t.Fatalf("down = %d, want about 5000 plus headers", down)
+	}
+	// A client that does not use the counter (the local Netdata one) must not move it.
+	before, _ := u.snapshot()
+	http.Get(srv.URL)
+	if after, _ := u.snapshot(); after != before {
+		t.Fatal("traffic from other clients must not be counted")
 	}
 }

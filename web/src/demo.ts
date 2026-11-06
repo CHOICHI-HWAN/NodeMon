@@ -64,7 +64,8 @@ export const demoApi: Api = {
         const t = Math.floor(now / 60) * 60 - i * 60;
         spark.push(t > last ? null : sample(s, t).cpu);
       }
-      return { id: String(s.id), created_at: s.id, name: s.name, os: s.os, online: now - last < 60, last_seen: last, latest: { ...sample(s, last) }, cpu_spark: spark };
+      const days = 6 + s.id * 3, perDay = 0.9e6 * (0.8 + (s.id % 3) * 0.2);
+      return { usage: { up: Math.round(days * perDay), down: Math.round(days * perDay * 0.12), up24h: s.offlineMin ? 0 : Math.round(perDay) }, id: String(s.id), created_at: s.id, name: s.name, os: s.os, online: now - last < 60, last_seen: last, latest: { ...sample(s, last) }, cpu_spark: spark };
     });
     return delay({ hosts, now });
   },

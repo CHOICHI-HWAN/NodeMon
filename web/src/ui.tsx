@@ -20,10 +20,13 @@ export function Bar({ value, label }: { value: number; label: string }) {
   );
 }
 
-export function Tile({ label, value, sub, bar }: { label: string; value: ReactNode; sub?: ReactNode; bar?: number }) {
+export const USAGE_HINT =
+  "컴퓨터가 데이터베이스(Firebase)로 보낸 데이터의 누적량입니다. 등록한 뒤부터 센 값이며 암호화·프로토콜 오버헤드를 포함하고 IP/TCP 헤더는 제외합니다. 몇 분 늦게 반영됩니다.";
+
+export function Tile({ label, value, sub, bar, hint }: { label: string; value: ReactNode; sub?: ReactNode; bar?: number; hint?: string }) {
   return (
     <div className="tile">
-      <div className="tile-label">{label}</div>
+      <div className="tile-label" title={hint}>{label}{hint ? " ⓘ" : ""}</div>
       <div className="tile-value">{value}</div>
       {bar != null && <Bar value={bar} label={label} />}
       {sub && <div className="tile-sub">{sub}</div>}
