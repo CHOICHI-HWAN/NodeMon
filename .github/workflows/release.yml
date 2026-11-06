@@ -5,6 +5,11 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Tag to create for this release, e.g. v0.1.0 (it points at the commit the workflow runs on)"
+        required: true
 
 permissions:
   contents: write
@@ -32,8 +37,10 @@ jobs:
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.version || github.ref_name }}
         run: |
-          gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP"/release/* \
-            --title "NodeMon connector $GITHUB_REF_NAME" \
+          gh release create "$TAG" "$RUNNER_TEMP"/release/* \
+            --target "$GITHUB_SHA" \
+            --title "NodeMon connector $TAG" \
             --generate-notes \
             --notes "Connector programs for each computer type, as ZIP files (each holds the program, the license and the third-party notices). Verify a download with SHA256SUMS. NodeMon is an independent project, not affiliated with Netdata, Inc."
