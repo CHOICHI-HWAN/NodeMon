@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // One-shot deploy: node firebase/deploy.mjs [--emails a@x.com,b@y.com] [--yes] [--dry-run]
 // Needs only Node.js 18+. Reads firebase/project.config.json (public Firebase identifiers).
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import path from "node:path";
@@ -84,7 +85,28 @@ step("보안 규칙 생성");
 writeFileSync(path.join(here, "database.rules.json"), JSON.stringify(buildRules(list), null, 2) + "\n");
 log(`  firebase/database.rules.json (${list.length}개 계정)`);
 
-// ---- 3. build the dashboard
+// ---- 3. connector downloads, served by the dashboard itself (needs Go; falls back to an earlier ./build-connector.sh)
+step("Connector 다운로드 파일 준비");
+const downloads = path.join(web, "public", "downloads");
+const connectorBuild = spawnSync(process.execPath, [path.join(root, "scripts", "build-connector.mjs"), "--out", downloads], { cwd: root, stdio: "inherit" });
+if (connectorBuild.status !== 0) {
+  const dist = path.join(root, "dist");
+  const prebuilt = existsSync(dist) ? readdirSync(dist).filter((n) => n.startsWith("nodemon-connector-")) : [];
+  if (prebuilt.length) {
+    mkdirSync(downloads, { recursive: true });
+    const sums = [];
+    for (const n of prebuilt) {
+      copyFileSync(path.join(dist, n), path.join(downloads, n));
+      sums.push(`${createHash("sha256").update(readFileSync(path.join(dist, n))).digest("hex")}  ${n}`);
+    }
+    writeFileSync(path.join(downloads, "SHA256SUMS"), sums.join("\n") + "\n");
+    log(`  Go로 새로 빌드하지 못해 dist/의 기존 파일 ${prebuilt.length}개를 사용합니다.`);
+  } else {
+    log("  ⚠ Connector 다운로드 파일 없이 배포합니다. Go를 설치하고 다시 실행하면 다운로드 링크가 생깁니다. (대시보드는 정상 동작합니다)");
+  }
+}
+
+// ---- 4. build the dashboard
 step("대시보드 빌드 (처음에는 몇 분 걸릴 수 있습니다)");
 if (run("npm", [existsSync(path.join(web, "package-lock.json")) ? "ci" : "install", "--no-audit", "--no-fund"], { cwd: web }).status !== 0) die("npm install 실패");
 if (run("npm", ["run", "build:firebase"], { cwd: web }).status !== 0) die("빌드 실패");

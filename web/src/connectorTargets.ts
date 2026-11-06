@@ -4,7 +4,7 @@
 
 export type Os = "linux" | "darwin" | "windows";
 export type Arch = "amd64" | "arm64" | "arm";
-export type Build = "dist" | "local"; // copy a prebuilt file from dist/, or build on this very computer
+export type Build = "download" | "dist" | "local"; // download from the dashboard, copy a file from dist/, or build on this very computer
 
 export const OS_LABEL: Record<Os, string> = { linux: "Linux", darwin: "macOS", windows: "Windows" };
 
@@ -35,6 +35,14 @@ export const checkCommand = (os: Os) => (os === "windows" ? "$env:PROCESSOR_ARCH
 
 export function runCommand(os: Os, file: string, args: string): string {
   return os === "windows" ? `.\\${file} ${args}` : `chmod +x ./${file} && ./${file} ${args}`;
+}
+
+export const downloadUrl = (origin: string, file: string) => `${origin}/downloads/${file}`;
+
+// Fetching from the terminal of the target computer is the simplest path; curl also avoids macOS's download quarantine.
+export function downloadCommand(os: Os, origin: string, file: string): string {
+  const url = downloadUrl(origin, file);
+  return os === "windows" ? `Invoke-WebRequest ${url} -OutFile ${file}` : `curl -fLO ${url}`;
 }
 
 export const BUILD_LOCAL = "cd connector && go build -o nodemon-connector . && cd ..";

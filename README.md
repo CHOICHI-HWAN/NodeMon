@@ -79,6 +79,14 @@ node firebase/deploy.mjs --emails 내계정@gmail.com
    ```
    이후에는 `./nodemon-connector`만 실행하면 됩니다(기본 3분마다 업로드). 간격은 `--upload-every 5m`처럼 바꿀 수 있습니다.
 
+### 업데이트 반영하기
+**GitHub에 코드를 올리는 것(push)과 Firebase에 배포하는 것은 별개입니다.** 코드가 바뀌어도 `https://<사이트>.web.app`은 다시 배포해야 바뀝니다. 배포하는 컴퓨터에서:
+```
+git pull
+node firebase/deploy.mjs --yes
+```
+보안 규칙과 대시보드, Connector 다운로드 파일이 모두 갱신됩니다. 이미 등록된 컴퓨터의 Connector는 자동으로 바뀌지 않으니, 새 기능이 필요하면 그 컴퓨터에서 새 파일을 내려받아 교체하세요(등록 정보는 그대로 유지됩니다).
+
 ### 처음 시험할 때 확인할 것
 1. 배포 후 `https://<프로젝트>.web.app`에서 **Google로 로그인**이 되는지 봅니다. (팝업 차단을 풀어 주세요. 허용 계정이 아니면 로그인은 되어도 컴퓨터 추가에서 막힙니다.)
 2. **컴퓨터 추가**를 눌러 나온 명령을 Netdata가 설치된 PC에서 실행합니다. 처음에 "enrolled"가 나오면 등록 성공입니다.
@@ -95,9 +103,18 @@ node firebase/deploy.mjs --emails 내계정@gmail.com
 | 노드가 "오프라인"으로만 표시 | Connector가 실행 중인지, Netdata(`localhost:19999`)가 응답하는지 확인하세요. |
 
 ### Connector 설치 (자세히)
-Connector는 Netdata가 설치된 컴퓨터마다 하나씩 실행합니다. 대시보드의 **컴퓨터 추가** 창에서 OS와 CPU 종류를 고르면 아래 내용이 그대로 나옵니다. 미리 만들어 둔 다운로드 파일은 아직 없어서 직접 빌드해야 합니다.
+Connector는 Netdata가 설치된 컴퓨터마다 하나씩 실행합니다. 대시보드의 **컴퓨터 추가** 창에서 OS와 CPU 종류를 고르면 아래 내용이 그대로 나옵니다.
 
-**1. 파일 만들기** (Go 1.24 이상이 있는 아무 컴퓨터 한 대에서)
+**가장 쉬운 방법: 대시보드에서 바로 내려받기.** `node firebase/deploy.mjs`로 배포하면 Connector 실행 파일도 함께 빌드되어 대시보드 사이트(`https://<사이트>.web.app/downloads/`)에 올라갑니다. 컴퓨터 추가 창의 "바로 다운로드"가 등록할 컴퓨터의 터미널에서 실행할 명령을 만들어 줍니다. 예:
+```
+curl -fLO https://comon.web.app/downloads/nodemon-connector-linux-amd64                     # Linux, macOS
+Invoke-WebRequest https://comon.web.app/downloads/nodemon-connector-windows-amd64.exe -OutFile nodemon-connector-windows-amd64.exe   # Windows PowerShell
+```
+`SHA256SUMS`(같은 폴더)로 변조 여부를 확인할 수 있습니다: `curl -fsSL https://comon.web.app/downloads/SHA256SUMS | grep <파일이름> | sha256sum -c -` (macOS는 `shasum -a 256 -c -`). 배포하는 컴퓨터에 **Go가 없으면** 새로 빌드하지 못하고, 이전에 만들어 둔 `dist/`의 파일이 있으면 그것을, 없으면 다운로드 파일 없이 배포합니다(대시보드는 정상). Go 설치 후 다시 배포하면 생깁니다.
+
+다운로드를 쓰지 않을 때는 아래 방법으로 직접 만들 수 있습니다.
+
+**1. 파일 만들기** (Go 1.24 이상이 있는 아무 컴퓨터 한 대에서. `node scripts/build-connector.mjs`도 같은 일을 하며 체크섬 파일까지 만듭니다)
 ```
 git clone https://github.com/CHOICHI-HWAN/NodeMon && cd NodeMon
 git checkout feat/nodemon-mvp        # 아직 main에 합치기 전이라면

@@ -13,3 +13,4 @@ web/dist-firebase/
 web/.env.*.local
 web/dist-emu/
 firebase/.allowed-emails
+web/public/downloads/
