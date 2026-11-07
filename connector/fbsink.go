@@ -140,7 +140,8 @@ func (s *fbSink) flush(now time.Time) error {
 	}
 	// ".sv" asks the database for its own clock, so online detection ignores this computer's clock.
 	// "iv" tells the dashboard how often to expect an upload, so it can tell "quiet" from "offline".
-	extra := map[string]any{"ts": map[string]string{".sv": "timestamp"}, "iv": int(s.uploadEvery.Seconds())}
+	// "cv" is the connector's own version, so the dashboard can show which computers run an old program.
+	extra := map[string]any{"ts": map[string]string{".sv": "timestamp"}, "iv": int(s.uploadEvery.Seconds()), "cv": version}
 	if s.last.Uptime > 0 {
 		// The dashboard adds the time since this upload, so the value stays right between uploads.
 		extra["ut"] = int64(s.last.Uptime)

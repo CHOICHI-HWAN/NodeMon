@@ -75,6 +75,8 @@ await denied("a non-numeric usage total is rejected", db(dev, "PUT", `latest/${d
 await ok("latest may carry the computer uptime", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, ut: 86400 }));
 await denied("a negative uptime is rejected", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, ut: -5 }));
 await denied("a non-numeric uptime is rejected", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, ut: "long" }));
+await ok("latest may carry the connector version", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, cv: "v0.1.0" }));
+await denied("an oversized connector version is rejected", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, cv: "v".repeat(41) }));
 await ok("latest may carry the biggest programs", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, ap: "postgres:80.5:900|nginx:12.3:150" }));
 await denied("the programs must be text", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, ap: { a: 1 } }));
 await denied("an oversized programs text is rejected", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, ap: "x".repeat(601) }));

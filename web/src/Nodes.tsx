@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { useMemo, useState } from "react";
 import { api, type Host } from "./api";
-import { DEMO } from "./env";
-import { fmtAgo, fmtBytes, fmtPct, fmtRate, fmtUptime, pct } from "./format";
+import { APP_VERSION, DEMO } from "./env";
+import { fmtAgo, fmtBytes, fmtPct, fmtRate, fmtUptime, olderThan, pct } from "./format";
 import { Sparkline } from "./Sparkline";
 import { Bar, Status, USAGE_HINT } from "./ui";
 
@@ -41,6 +41,7 @@ export function Nodes({ hosts, now, colors, onDeleted }: { hosts: Host[]; now: n
 
   const live = hosts.filter((h) => h.online).length;
   const showUsage = hosts.some((h) => h.usage);
+  const showVersion = hosts.some((h) => h.connector);
   const showUptime = hosts.some((h) => h.uptime != null);
   const th = (key: SortKey, label: string) => (
     <th aria-sort={sort.key === key ? (sort.dir === 1 ? "ascending" : "descending") : "none"}>
@@ -84,6 +85,7 @@ export function Nodes({ hosts, now, colors, onDeleted }: { hosts: Host[]; now: n
               <th>네트워크</th>
               {showUsage && <th title={USAGE_HINT}>업로드 ⓘ</th>}
               {showUptime && <th title="컴퓨터가 마지막으로 켜진 뒤 지난 시간">가동 시간 ⓘ</th>}
+              {showVersion && <th title="각 컴퓨터에서 실행 중인 Connector 프로그램의 버전">Connector ⓘ</th>}
               <th>마지막 수신</th>
               {!DEMO && <th><span className="sr-only">삭제</span></th>}
             </tr>
@@ -119,6 +121,12 @@ export function Nodes({ hosts, now, colors, onDeleted }: { hosts: Host[]; now: n
                   </td>
                   )}
                   {showUptime && <td>{h.uptime != null ? fmtUptime(h.uptime) : "–"}</td>}
+                  {showVersion && (
+                    <td className="muted">
+                      {h.connector ?? "–"}
+                      {olderThan(h.connector, APP_VERSION) && <span className="badge-old" title="대시보드보다 오래된 버전입니다. 새 Connector로 바꾸면 최신 기능을 쓸 수 있습니다.">구버전</span>}
+                    </td>
+                  )}
                   <td className="muted">{fmtAgo(h.last_seen, now)}</td>
                   {!DEMO && <td><button className="danger small" onClick={() => remove(h)} aria-label={`${h.name} 삭제`}>삭제</button></td>}
                 </tr>
@@ -126,7 +134,7 @@ export function Nodes({ hosts, now, colors, onDeleted }: { hosts: Host[]; now: n
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={9 + (DEMO ? 0 : 1) + (showUsage ? 1 : 0) + (showUptime ? 1 : 0)} className="muted center">조건에 맞는 노드가 없습니다</td>
+                <td colSpan={9 + (DEMO ? 0 : 1) + (showVersion ? 1 : 0) + (showUsage ? 1 : 0) + (showUptime ? 1 : 0)} className="muted center">조건에 맞는 노드가 없습니다</td>
               </tr>
             )}
           </tbody>

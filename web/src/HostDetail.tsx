@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { AppsPanel } from "./AppsPanel";
 import { api, pollMs, RANGES, type Host, type RangeKey } from "./api";
-import { DEMO } from "./env";
-import { fmtAgo, fmtBytes, fmtDateTime, fmtPct, fmtRate, fmtUptime, pct } from "./format";
+import { APP_VERSION, DEMO } from "./env";
+import { fmtAgo, fmtBytes, fmtDateTime, fmtPct, fmtRate, fmtUptime, olderThan, pct } from "./format";
 import { HoverProvider } from "./hover";
 import { usePoll } from "./hooks";
 import { LineChart } from "./LineChart";
@@ -49,7 +49,8 @@ export function HostDetail({ host, color, now, range, paused, onDeleted }: Props
         <span className="key" style={{ background: color }} />
         <h2>{host.name}</h2>
         <Status online={host.online} />
-        <span className="muted">{host.os} · 마지막 수신 {fmtAgo(host.last_seen, now)}</span>
+        <span className="muted">{host.os} · 마지막 수신 {fmtAgo(host.last_seen, now)}{host.connector ? ` · Connector ${host.connector}` : ""}</span>
+        {olderThan(host.connector, APP_VERSION) && <span className="badge-old" title="대시보드보다 오래된 버전입니다. 새 Connector로 바꾸면 최신 기능을 쓸 수 있습니다.">구버전</span>}
         <div className="grow" />
         {!DEMO && <button className="danger" onClick={remove}>노드 삭제</button>}
       </div>

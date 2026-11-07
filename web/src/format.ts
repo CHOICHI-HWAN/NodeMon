@@ -50,3 +50,14 @@ export function fmtDateTime(t: number): string {
   const d = new Date(t * 1000);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+const semver = (v: string) => v.match(/(\d+)\.(\d+)\.(\d+)/)?.slice(1, 4).map(Number) ?? null;
+
+// True when a connector's version is clearly older than the dashboard's release. Versions that are not releases
+// (a commit id, "dev") cannot be compared, so they never count as old.
+export function olderThan(connector: string | null | undefined, dashboard: string): boolean {
+  const a = connector ? semver(connector) : null, b = semver(dashboard);
+  if (!a || !b) return false;
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] < b[i];
+  return false;
+}

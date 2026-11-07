@@ -23,6 +23,7 @@ export type Host = {
   latest: Sample | null;
   cpu_spark: (number | null)[];
   uptime?: number | null; // seconds since the computer booted, as of now; null while it is offline or does not report it
+  connector?: string | null; // the connector's version as it reported it (e.g. v0.1.0); null for connectors that predate this
   apps?: App[] | null; // the programs that used the most CPU or memory at the last upload; null where the computer does not report them
   usage?: Usage | null; // data this computer has sent to / received from the database; null if it does not report it
 };

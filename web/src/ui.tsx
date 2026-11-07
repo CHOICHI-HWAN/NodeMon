@@ -14,7 +14,7 @@ export function Status({ online }: { online: boolean }) {
 export function Bar({ value, label }: { value: number; label: string }) {
   return (
     <div className="track" role="meter" aria-label={label} aria-valuenow={Math.round(value)} aria-valuemin={0} aria-valuemax={100}>
-      <div className="fill" style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
+      <div className={`fill${value >= 90 ? " crit" : value >= 80 ? " warn" : ""}`} style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
     </div>
   );
 }

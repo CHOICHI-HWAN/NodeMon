@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { fmtTime } from "./format";
 import { useHover } from "./hover";
 
@@ -34,6 +34,7 @@ const lastIndex = (vals: (number | null)[]) => {
 
 export function LineChart({ title, xs, series, fmt, from, to, max, height = 180, loading, area }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
+  const gid = useId().replace(/:/g, "");
   const [w, setW] = useState(600);
   const [local, setLocal] = useState(false); // pointer or keyboard focus is on this chart
   const [table, setTable] = useState(false);
@@ -178,7 +179,17 @@ export function LineChart({ title, xs, series, fmt, from, to, max, height = 180,
               ))}
               {series.map((s, i) => (
                 <g key={s.key}>
-                  {area && series.length === 1 && <path d={drawn[i].fill} fill={s.color} fillOpacity={0.16} stroke="none" />}
+                  {area && series.length === 1 && (
+                    <>
+                      <defs>
+                        <linearGradient id={`g${gid}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0" stopColor={s.color} stopOpacity={0.32} />
+                          <stop offset="1" stopColor={s.color} stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <path d={drawn[i].fill} fill={`url(#g${gid})`} stroke="none" />
+                    </>
+                  )}
                   <path d={drawn[i].line} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
                   {drawn[i].dots.map(([cx, cy], j) => (
                     <circle key={j} cx={cx} cy={cy} r={3} fill={s.color} />

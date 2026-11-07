@@ -112,6 +112,7 @@ export function buildRules(emails) {
           ts: { ".validate": "newData.isNumber()" },
           iv: { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 86400" },
           ut: { ".validate": "newData.isNumber() && newData.val() >= 0" }, // computer uptime in seconds at upload time
+          cv: { ".validate": "newData.isString() && newData.val().length <= 40" }, // connector version, e.g. v0.1.0
           ...Object.fromEntries(FIELDS.map((f) => [f, num])),
           ...USAGE,
           ...APPS,

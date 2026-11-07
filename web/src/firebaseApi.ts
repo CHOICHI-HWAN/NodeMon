@@ -225,6 +225,7 @@ export const firebaseApi: Api = {
           uptime: latest?.ut != null && nowMs - latest.ts < graceMs ? latest.ut + Math.max(0, nowMs - latest.ts) / 1000 : null,
           last_seen: lastSeen,
           latest: latest ? toSample(latest) : null,
+          connector: (latest as { cv?: string } | null)?.cv ?? null,
           apps: parseApps((latest as { ap?: string } | null)?.ap) ?? null,
           cpu_spark: await spark(id, nowSec),
           usage: latest?.up != null ? { up: latest.up, down: latest.down ?? 0, up24h: await upLast24h(id, latest.up, d.createdAt, nowSec) } : null,

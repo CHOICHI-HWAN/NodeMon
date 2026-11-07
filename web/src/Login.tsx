@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { useState } from "react";
 import { api } from "./api";
+import { APP_VERSION } from "./env";
 
 export function Login({ onLogin, startupError }: { onLogin: () => void; startupError?: string | null }) {
   const [error, setError] = useState<string | null>(null);
@@ -19,6 +20,7 @@ export function Login({ onLogin, startupError }: { onLogin: () => void; startupE
   return (
     <div className="login">
       <div className="card login-card">
+        <div className="login-mark" aria-hidden="true">N</div>
         <h1>NodeMon</h1>
         <p className="sub">여러 컴퓨터의 자원 사용 현황을 한 곳에서 확인하세요.</p>
         <button className="primary big" onClick={() => run(() => api.login!())}>Google 계정으로 로그인</button>
@@ -32,7 +34,7 @@ export function Login({ onLogin, startupError }: { onLogin: () => void; startupE
         {(error ?? startupError) && <p className="err">{error ?? startupError}</p>}
         <p className="login-foot">NodeMon은 Netdata, Inc.와 무관한 독립 프로젝트입니다. Netdata는 Netdata, Inc.의 상표입니다.</p>
         <p className="login-foot">
-          GPL-3.0-or-later · <a href="https://github.com/CHOICHI-HWAN/NodeMon" target="_blank" rel="noreferrer">소스 코드</a> ·{" "}
+          v{APP_VERSION} · GPL-3.0-or-later · <a href="https://github.com/CHOICHI-HWAN/NodeMon" target="_blank" rel="noreferrer">소스 코드</a> ·{" "}
           <a href="/third-party-licenses.txt" target="_blank" rel="noreferrer">오픈소스 라이선스</a>
         </p>
       </div>

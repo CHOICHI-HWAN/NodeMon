@@ -8,12 +8,20 @@ NodeMon is an independent project, not affiliated with Netdata, Inc.
 ## [Unreleased]
 
 ### Added
+- Versions on screen: the dashboard's version (account menu and login page) and the version of the connector each
+  computer runs (nodes table and computer page, with an "old version" badge when a connector is older than the
+  dashboard). The connector reports its version in a new `cv` field.
 - Per-program usage on the computer detail page (Linux only, from Netdata's apps charts): which programs used the
   most CPU and memory, a chart of their CPU over the chosen range, average and peak per program, an estimate of the
   CPU time each used, and a warning for programs whose CPU jumped far above their usual level. Computers that
   cannot report it (macOS, Windows, or an older connector) show an explanation instead.
 - The connector sends the top 4 CPU users and top 3 memory users as one short text field `ap`; the database rules
   accept it. This adds roughly 2 to 4 MB per month for a Linux computer with the default 3-minute uploads.
+
+### Changed
+- Visual refresh: new color tokens and typography, rounded cards with soft shadows, gradient accents, pill controls,
+  usage bars that turn amber above 80% and red above 90%, gradient chart fills, a frosted top bar, a redesigned login
+  page and add-computer window, and refined light and dark themes.
 
 ## [0.1.0] - 2026-11-06
 
