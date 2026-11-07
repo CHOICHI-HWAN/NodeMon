@@ -18,6 +18,10 @@ NodeMon is an independent project, not affiliated with Netdata, Inc.
 - The connector sends the top 4 CPU users and top 3 memory users as one short text field `ap`; the database rules
   accept it. This adds roughly 2 to 4 MB per month for a Linux computer with the default 3-minute uploads.
 
+- Automatic deployment: a GitHub Actions workflow publishes the dashboard and the security rules whenever `main`
+  changes, using a service account key and the allowed accounts stored as repository secrets. It does nothing until
+  those secrets exist. `firebase/deploy.mjs` has a matching `--ci` mode (no prompts, no interactive login).
+
 ### Changed
 - Visual refresh: new color tokens and typography, rounded cards with soft shadows, gradient accents, pill controls,
   usage bars that turn amber above 80% and red above 90%, gradient chart fills, a frosted top bar, a redesigned login

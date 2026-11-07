@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: GPL-3.0-or-later
-// One-shot deploy: node firebase/deploy.mjs [--emails a@x.com,b@y.com] [--yes] [--dry-run]
+// One-shot deploy: node firebase/deploy.mjs [--emails a@x.com,b@y.com] [--yes] [--dry-run] [--ci]
+// --ci is for the GitHub Actions deploy: no prompts, the accounts come from ALLOWED_EMAILS, and Firebase is reached
+// with the service account named by GOOGLE_APPLICATION_CREDENTIALS instead of an interactive login.
 // Needs only Node.js 18+. Reads firebase/project.config.json (public Firebase identifiers).
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -19,6 +21,7 @@ const args = process.argv.slice(2);
 const flag = (n) => args.includes(n);
 const opt = (n) => (args.includes(n) ? args[args.indexOf(n) + 1] : undefined);
 const dryRun = flag("--dry-run");
+const ci = flag("--ci");
 
 const log = (m = "") => console.log(m);
 let stepNo = 0;
@@ -46,15 +49,16 @@ if (!/^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)*\.(firebaseio\.com|firebasedatabase\.a
 // Accounts allowed to sign in: --emails, ALLOWED_EMAILS, the value remembered from last time, or a prompt.
 const cache = path.join(here, ".allowed-emails");
 let emails = opt("--emails") ?? process.env.ALLOWED_EMAILS ?? (existsSync(cache) ? readFileSync(cache, "utf8") : "");
+if (!emails.trim() && ci) die("--ci needs the allowed accounts in ALLOWED_EMAILS (a repository secret in GitHub Actions).");
 if (!emails.trim()) emails = await ask("로그인을 허용할 Google 계정 (쉼표로 여러 개): ");
 const list = emails.split(",").map((s) => s.trim()).filter(Boolean);
 try { buildRules(list); } catch (e) { die(e.message); }
-writeFileSync(cache, list.join(",") + "\n");
+if (!ci) writeFileSync(cache, list.join(",") + "\n");
 
 log(`프로젝트      : ${cfg.projectId}`);
 log(`호스팅 사이트 : https://${cfg.site}.web.app`);
 log(`데이터베이스  : ${cfg.databaseURL}`);
-log(`허용 계정     : ${list.join(", ")}`);
+log(`허용 계정     : ${ci ? `${list.length}개 (로그에는 표시하지 않음)` : list.join(", ")}`);
 if (dryRun) log("(--dry-run: 로그인과 배포는 건너뜁니다)");
 
 // ---- 1. project files
@@ -97,12 +101,16 @@ if (dryRun) {
 
 // ---- 4. sign in to Firebase
 step("Firebase 로그인 확인");
+if (ci) {
+  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS || !existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)) die("--ci needs GOOGLE_APPLICATION_CREDENTIALS to point to a service account key file.");
+  log("  서비스 계정으로 배포합니다.");
+}
 const projects = () => {
   const r = npx(["projects:list", "--json"], { quiet: true });
   if (r.status !== 0) return null;
   try { return JSON.parse(r.stdout).result.map((p) => p.projectId); } catch { return null; }
 };
-let ids = projects();
+let ids = ci ? [cfg.projectId] : projects(); // the service account is checked by the deploy itself
 if (!ids) {
   log("  로그인이 필요합니다. 브라우저가 열리면 Firebase 프로젝트가 있는 Google 계정으로 로그인하세요.");
   if (npx(["login"]).status !== 0) die("로그인 실패");
@@ -116,7 +124,7 @@ log(`  '${cfg.projectId}' 접근 확인`);
 step("배포");
 log(`  - Realtime Database 규칙이 이 DB의 기존 규칙을 '교체'합니다: ${cfg.databaseURL}`);
 log(`  - 호스팅은 사이트 '${cfg.site}'에만 올라갑니다 (다른 사이트는 건드리지 않음)`);
-if (!flag("--yes") && (await ask("계속할까요? [y/N] ")).toLowerCase() !== "y") die("취소했습니다.");
+if (!flag("--yes") && !ci && (await ask("계속할까요? [y/N] ")).toLowerCase() !== "y") die("취소했습니다.");
 if (npx(["deploy", "--only", "database,hosting", "--project", cfg.projectId]).status !== 0) die("배포 실패. 위 오류 메시지를 확인하세요.");
 
 log(`

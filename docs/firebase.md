@@ -46,6 +46,18 @@ node firebase/deploy.mjs --yes
 보안 규칙과 대시보드가 갱신됩니다(Connector 파일은 GitHub 릴리스에 있어 배포와 무관합니다). 이미 등록된 컴퓨터의 Connector는 자동으로 바뀌지 않으니, 새 기능이 필요하면 그 컴퓨터에서 새 파일을 내려받아 교체하세요(등록 정보는 그대로 유지됩니다).
 
 
+## 자동 배포 (GitHub Actions)
+`main`에 코드가 올라올 때마다 대시보드와 보안 규칙을 자동으로 배포합니다(`.github/workflows/deploy.yml`). 아래 설정을 해 두지 않으면 이 워크플로는 "건너뜀" 안내만 남기고 아무것도 하지 않으므로, 설정 전에도 실패하지 않습니다. 한 번만 설정하세요.
+
+1. **서비스 계정 만들기**: [Google Cloud 콘솔](https://console.cloud.google.com/iam-admin/serviceaccounts) → 프로젝트 선택 → *서비스 계정 만들기*(예: `nodemon-deploy`). 역할은 가장 간단하게 **Firebase Admin**(`roles/firebase.admin`)을 주세요. 더 좁히려면 *Firebase Hosting Admin*, *Firebase Realtime Database Admin*, *Service Usage Consumer*가 필요하지만, 이 조합은 아직 실제로 시험하지 못했고 권한 부족 오류가 나면 Firebase Admin으로 바꾸면 됩니다.
+2. **키 만들기**: 그 서비스 계정 → *키* → *키 추가* → *새 키 만들기* → **JSON**. 내려받은 파일 내용이 비밀 값입니다(저장소에 올리지 마세요).
+3. **저장소 비밀 값 두 개 등록**: GitHub 저장소 → Settings → Secrets and variables → Actions → *New repository secret*.
+   - `FIREBASE_SERVICE_ACCOUNT`: 2번에서 받은 JSON 파일의 **전체 내용**
+   - `ALLOWED_EMAILS`: 로그인을 허용할 Google 계정, 쉼표로 구분 (예: `a@gmail.com,b@gmail.com`). 이 값은 보안 규칙에 들어갑니다.
+4. Actions 탭 → *Deploy to Firebase* → *Run workflow*로 처음 한 번 실행해 보거나, `web/`·`firebase/` 아래를 바꿔 `main`에 올리면 자동으로 돌아갑니다.
+
+로그에 허용 계정은 표시되지 않습니다(개수만). 배포는 동시에 한 건만 돌고, 서비스 계정 키는 실행이 끝나면 지워집니다. 콘솔에서 해야 하는 일(Google·익명 로그인 사용 설정, 승인된 도메인)은 자동화되지 않으므로 처음 한 번 직접 하세요. 키가 유출되었다면 콘솔에서 그 키를 삭제하고 새로 만드세요.
+
 ## 처음 시험할 때 확인할 것
 1. 배포 후 `https://<프로젝트>.web.app`에서 **Google로 로그인**이 되는지 봅니다. (팝업 차단을 풀어 주세요. 허용 계정이 아니면 로그인은 되어도 컴퓨터 추가에서 막힙니다.)
 2. **컴퓨터 추가**를 눌러 나온 명령을 Netdata가 설치된 PC에서 실행합니다. 처음에 "enrolled"가 나오면 등록 성공입니다.

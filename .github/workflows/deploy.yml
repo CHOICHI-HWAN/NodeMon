@@ -1,0 +1,65 @@
+name: Deploy to Firebase
+
+# Publishes the dashboard (Firebase Hosting) and the database security rules every time main changes.
+# It needs two repository secrets (Settings > Secrets and variables > Actions); without them it only says so and
+# does nothing, so a fork or a fresh clone never fails here. See docs/firebase.md, "자동 배포".
+#   FIREBASE_SERVICE_ACCOUNT  the JSON key of a service account that may deploy to the project
+#   ALLOWED_EMAILS            the Google accounts that may sign in, separated by commas
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", "firebase/**", "firebase.json", "CHANGELOG.md", ".github/workflows/deploy.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Two deploys at once could leave an older build online; the second waits for the first.
+concurrency:
+  group: firebase-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check that the secrets exist
+        id: secrets
+        env:
+          KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          EMAILS: ${{ secrets.ALLOWED_EMAILS }}
+        run: |
+          if [ -z "$KEY" ] || [ -z "$EMAILS" ]; then
+            echo "::notice::Skipping the deploy: add the FIREBASE_SERVICE_ACCOUNT and ALLOWED_EMAILS secrets to enable it (docs/firebase.md)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.ready == 'true'
+        with:
+          fetch-depth: 0 # the dashboard shows the commit it was built from
+      - uses: actions/setup-node@v4
+        if: steps.secrets.outputs.ready == 'true'
+        with:
+          node-version: 22
+      - name: Write the service account key
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          umask 077
+          printf '%s' "$KEY" > "$RUNNER_TEMP/firebase-key.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-key.json" >> "$GITHUB_ENV"
+      - name: Build targets agree
+        if: steps.secrets.outputs.ready == 'true'
+        run: node scripts/check-targets.mjs
+      - name: Deploy
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          ALLOWED_EMAILS: ${{ secrets.ALLOWED_EMAILS }}
+        run: node firebase/deploy.mjs --ci
+      - name: Remove the key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/firebase-key.json"
