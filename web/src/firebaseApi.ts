@@ -24,6 +24,7 @@ import {
   set,
   startAt,
 } from "firebase/database";
+import { meanApps, parseApps, summarizeApps } from "./apps";
 import { RANGES, unauthorized, type Api, type Host, type Point, type Sample } from "./api";
 
 // Reads one value from a Vite env var.
@@ -108,7 +109,7 @@ async function readBuckets(kind: "m" | "h", id: string, from: number, to: number
   }
   const snaps = await Promise.all(keys.map((k) => get(query(ref(fb().db, `${kind}/${id}/${k}`), orderByKey(), startAt(String(from))))));
   const out: Point[] = [];
-  for (const s of snaps) s.forEach((c) => { out.push({ ...toSample(c.val()), t: c.val().t, up: c.val().up, down: c.val().down }); });
+  for (const s of snaps) s.forEach((c) => { out.push({ ...toSample(c.val()), t: c.val().t, up: c.val().up, down: c.val().down, apps: parseApps(c.val().ap) }); });
   return out.sort((a, b) => a.t - b.t);
 }
 
@@ -143,7 +144,7 @@ function downsample(points: Point[], bucket: number): Point[] {
   }
   return [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([t, g]) => {
     const avg = (f: (typeof FIELDS)[number]) => g.reduce((s, p) => s + p[f], 0) / g.length;
-    return { t, cpu: avg("cpu"), mem_used: avg("mem_used"), mem_total: avg("mem_total"), disk_used: avg("disk_used"), disk_total: avg("disk_total"), net_rx: avg("net_rx"), net_tx: avg("net_tx"), load1: avg("load1") };
+    return { t, apps: meanApps(g), cpu: avg("cpu"), mem_used: avg("mem_used"), mem_total: avg("mem_total"), disk_used: avg("disk_used"), disk_total: avg("disk_total"), net_rx: avg("net_rx"), net_tx: avg("net_tx"), load1: avg("load1") };
   });
 }
 
@@ -224,6 +225,7 @@ export const firebaseApi: Api = {
           uptime: latest?.ut != null && nowMs - latest.ts < graceMs ? latest.ut + Math.max(0, nowMs - latest.ts) / 1000 : null,
           last_seen: lastSeen,
           latest: latest ? toSample(latest) : null,
+          apps: parseApps((latest as { ap?: string } | null)?.ap) ?? null,
           cpu_spark: await spark(id, nowSec),
           usage: latest?.up != null ? { up: latest.up, down: latest.down ?? 0, up24h: await upLast24h(id, latest.up, d.createdAt, nowSec) } : null,
         };
@@ -240,13 +242,15 @@ export const firebaseApi: Api = {
     const from = to - sec;
     const long = sec > 24 * 3600; // week/month views read hourly averages instead of minute ones
     const pts = [...(await readCached(long ? "h" : "m", id, from, to))]; // copy: the cache must not gain the live point below
+    const stored = pts.slice(); // what was recorded; the live value below is one short reading, so it stays out of the summary
     // Extend the chart to "now" with the live value, which is ahead of the last finished minute.
     const latest = (await get(ref(fb().db, `latest/${id}`))).val() as (Record<string, number> & { ts: number }) | null;
     if (latest && Math.floor(latest.ts / 1000) > (pts[pts.length - 1]?.t ?? 0) && Math.floor(latest.ts / 1000) >= from) {
-      pts.push({ ...toSample(latest), t: Math.floor(latest.ts / 1000) });
+      pts.push({ ...toSample(latest), t: Math.floor(latest.ts / 1000), apps: parseApps((latest as { ap?: string }).ap) });
     }
     const bucket = Math.max(long ? 3600 : 60, Math.floor(sec / 300));
-    return { points: downsample(pts, bucket), bucket };
+    const points = downsample(pts, bucket);
+    return { points, bucket, report: summarizeApps(stored, points) };
   },
 
   async deleteHost(id) {

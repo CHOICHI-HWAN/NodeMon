@@ -42,7 +42,7 @@ func fetchNetdata(c *http.Client, base string) (map[string]ndChart, error) {
 // wantedChart reports whether toSample reads this chart. Everything else Netdata sends is skipped.
 func wantedChart(id string) bool {
 	switch id {
-	case "system.cpu", "system.ram", "system.net", "system.load", "system.uptime":
+	case "system.cpu", "system.ram", "system.net", "system.load", "system.uptime", "apps.cpu", "apps.mem":
 		return true
 	}
 	return strings.HasPrefix(id, "disk_space.")
@@ -158,7 +158,26 @@ func toSample(charts map[string]ndChart) (sample, error) {
 	if u, ok := charts["system.uptime"]; ok {
 		s.Uptime, _ = u.dim("uptime")
 	}
+	s.Apps = appsFrom(charts["apps.cpu"], charts["apps.mem"])
 	return s, nil
+}
+
+// appsFrom reads Netdata's per-program charts (Linux and FreeBSD; elsewhere they do not exist and nothing is sent).
+func appsFrom(cpu, mem ndChart) []appUse {
+	use := map[string]appUse{}
+	for name := range cpu.Dimensions {
+		if v, ok := cpu.dim(name); ok {
+			use[name] = appUse{Name: name, CPU: v}
+		}
+	}
+	for name := range mem.Dimensions {
+		if v, ok := mem.dim(name); ok {
+			a := use[name]
+			a.Name, a.Mem = name, v
+			use[name] = a
+		}
+	}
+	return pickApps(use)
 }
 
 func newHTTPClient() *http.Client { return &http.Client{Timeout: 10 * time.Second} }

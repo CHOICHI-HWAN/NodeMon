@@ -8,6 +8,8 @@ const FIELDS = ["cpu", "mem_used", "mem_total", "disk_used", "disk_total", "net_
 const num = { ".validate": "newData.isNumber() && newData.val() >= 0" };
 // Optional running totals of bytes the connector has sent to / received from the database.
 const USAGE = { up: num, down: num };
+// Optional: the programs that used the most CPU/memory, as "name:cpu:mem|name:cpu:mem" (at most 7 short entries).
+const APPS = { ap: { ".validate": "newData.isString() && newData.val().length <= 600" } };
 
 export function buildRules(emails) {
   if (!emails.length) throw new Error("at least one allowed email is required");
@@ -28,6 +30,7 @@ export function buildRules(emails) {
     [timeKey]: { ".validate": "newData.isNumber()" },
     ...Object.fromEntries(FIELDS.map((f) => [f, num])),
     ...USAGE,
+    ...APPS,
     $other: { ".validate": false },
   });
 
@@ -111,6 +114,7 @@ export function buildRules(emails) {
           ut: { ".validate": "newData.isNumber() && newData.val() >= 0" }, // computer uptime in seconds at upload time
           ...Object.fromEntries(FIELDS.map((f) => [f, num])),
           ...USAGE,
+          ...APPS,
           $other: { ".validate": false },
         },
       },

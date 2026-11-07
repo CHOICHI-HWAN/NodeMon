@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"testing"
 )
 
@@ -83,7 +84,7 @@ func TestReadChartsMatchesFullDecode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != want {
+	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("different result:\n got %+v\nwant %+v", got, want)
 	}
 	if len(charts) >= len(all)/2 {

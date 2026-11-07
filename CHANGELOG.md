@@ -7,6 +7,14 @@ NodeMon is an independent project, not affiliated with Netdata, Inc.
 
 ## [Unreleased]
 
+### Added
+- Per-program usage on the computer detail page (Linux only, from Netdata's apps charts): which programs used the
+  most CPU and memory, a chart of their CPU over the chosen range, average and peak per program, an estimate of the
+  CPU time each used, and a warning for programs whose CPU jumped far above their usual level. Computers that
+  cannot report it (macOS, Windows, or an older connector) show an explanation instead.
+- The connector sends the top 4 CPU users and top 3 memory users as one short text field `ap`; the database rules
+  accept it. This adds roughly 2 to 4 MB per month for a Linux computer with the default 3-minute uploads.
+
 ## [0.1.0] - 2026-11-06
 
 First release. NodeMon shows the resource usage of one or many computers on a dashboard that runs on the free

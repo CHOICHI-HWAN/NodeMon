@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+import { AppsPanel } from "./AppsPanel";
 import { api, pollMs, RANGES, type Host, type RangeKey } from "./api";
 import { DEMO } from "./env";
 import { fmtAgo, fmtBytes, fmtDateTime, fmtPct, fmtRate, fmtUptime, pct } from "./format";
@@ -76,6 +77,7 @@ export function HostDetail({ host, color, now, range, paused, onDeleted }: Props
           )}
         </div>
       )}
+      <AppsPanel host={host} report={data?.report ?? null} xs={pts.map((p) => p.t)} win={{ from: win.from, to: win.to, loading: win.loading }} />
       <Section title="시스템">
         <div className="grid charts">
           <LineChart title="CPU 사용률" {...win} fmt={fmtPct} max={100} series={[{ key: "cpu", label: "CPU", color, values: pts.map((p) => p.cpu) }]} />

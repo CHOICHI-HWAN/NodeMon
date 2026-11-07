@@ -23,13 +23,29 @@ export type Host = {
   latest: Sample | null;
   cpu_spark: (number | null)[];
   uptime?: number | null; // seconds since the computer booted, as of now; null while it is offline or does not report it
+  apps?: App[] | null; // the programs that used the most CPU or memory at the last upload; null where the computer does not report them
   usage?: Usage | null; // data this computer has sent to / received from the database; null if it does not report it
 };
 
 // Bytes, counted by the connector at the network socket: includes encryption and protocol overhead.
 export type Usage = { up: number; down: number; up24h: number | null };
 
-export type Point = Sample & { t: number; up?: number; down?: number };
+export type Point = Sample & { t: number; up?: number; down?: number; apps?: App[] };
+
+// One program (Netdata groups processes by name, e.g. nginx or chrome). cpu: percent of ONE core, so 200 means two
+// cores kept busy. mem: resident memory in MiB.
+export type App = { name: string; cpu: number; mem: number };
+export type AppUsage = {
+  name: string;
+  cpuAvg: number;
+  cpuPeak: number;
+  peakAt: number; // unix seconds of the highest CPU reading
+  memAvg: number;
+  memPeak: number;
+  spike: boolean; // the peak was far above the usual level
+  series: (number | null)[]; // CPU per chart column; empty for programs that are not drawn
+};
+export type AppsReport = { apps: AppUsage[]; spanSec: number };
 export type User = { email: string; name: string };
 // args: the connector command-line arguments that enroll a computer with this code.
 export type EnrollCode = { code: string; expires_at: number; args: string };
@@ -46,7 +62,7 @@ export interface Api {
   login?(): Promise<void>;
   emulatorLogin?(email: string): Promise<void>;
   overview(): Promise<{ hosts: Host[]; now: number }>;
-  metrics(id: string, range: string): Promise<{ points: Point[]; bucket: number }>;
+  metrics(id: string, range: string): Promise<{ points: Point[]; bucket: number; report: AppsReport | null }>;
   deleteHost(id: string): Promise<void>;
   createCode(): Promise<EnrollCode>;
   logout(): Promise<void>;

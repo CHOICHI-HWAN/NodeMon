@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import type { Api, Host, Point } from "./api";
+import { summarizeApps } from "./apps";
+import type { Api, App, Host, Point } from "./api";
 
 export type DemoMode = "single" | "multi";
 export const demoState: { mode: DemoMode } = { mode: "multi" };
 
 type Spec = { id: number; name: string; os: string; cpu: number; mem: number; disk: number; memGB: number; diskGB: number; offlineMin?: number };
 const SPECS: Spec[] = [
-  { id: 1, name: "desktop-win11", os: "windows", cpu: 35, mem: 60, disk: 0.55, memGB: 16, diskGB: 1000 },
+  { id: 1, name: "dev-workstation", os: "linux", cpu: 35, mem: 60, disk: 0.55, memGB: 16, diskGB: 1000 },
   { id: 2, name: "macbook-pro", os: "darwin", cpu: 20, mem: 70, disk: 0.8, memGB: 16, diskGB: 500 },
   { id: 3, name: "ubuntu-server", os: "linux", cpu: 60, mem: 45, disk: 0.5, memGB: 32, diskGB: 2000 },
   { id: 4, name: "synology-nas", os: "linux", cpu: 8, mem: 30, disk: 0.4, memGB: 8, diskGB: 4000 },
@@ -40,14 +41,42 @@ function sample(s: Spec, t: number): Omit<Point, "t"> {
   };
 }
 
+// Programs, as Netdata's apps plugin groups them. Only Linux computers report them, like the real thing.
+const PROGRAMS: { name: string; base: number; mem: number }[] = [
+  { name: "postgres", base: 9, mem: 900 },
+  { name: "node", base: 6, mem: 420 },
+  { name: "nginx", base: 3, mem: 140 },
+  { name: "chrome", base: 12, mem: 1400 },
+  { name: "sshd", base: 0.4, mem: 12 },
+];
+function programs(s: Spec, t: number): App[] | undefined {
+  if (s.os !== "linux") return undefined;
+  // About every 50 minutes one program (different per computer) runs hot for ten minutes: the "sudden jump".
+  const slot = Math.floor(t / 600), hot = Math.floor(slot / 5) % PROGRAMS.length === s.id % PROGRAMS.length && slot % 5 === 0;
+  return PROGRAMS.map((p, i) => ({
+    name: p.name,
+    cpu: Math.max(0, p.base * (1 + 0.5 * Math.sin(t / 700 + i + s.id)) + noise(t, i + s.id) * 2 + (hot && i === s.id % PROGRAMS.length ? 70 : 0)),
+    mem: p.mem * (0.9 + 0.2 * noise(Math.floor(t / 3600), i)),
+  }))
+    .sort((a, b) => b.cpu - a.cpu)
+    .slice(0, 6);
+}
+
 const lastTs = (s: Spec, now: number) => (s.offlineMin ? now - s.offlineMin * 60 : now - ((s.id * 3) % 9));
 
-function points(s: Spec, rangeSec: number, now: number): { points: Point[]; bucket: number } {
+// What a real database would hold: one reading every three minutes, from which peaks can be read.
+function rawPoints(s: Spec, rangeSec: number, end: number): Point[] {
+  const out: Point[] = [];
+  for (let t = Math.ceil((end - rangeSec) / 180) * 180; t <= end; t += 180) out.push({ t, ...sample(s, t), apps: programs(s, t) });
+  return out;
+}
+
+function points(s: Spec, rangeSec: number, now: number): { points: Point[]; bucket: number; report: ReturnType<typeof summarizeApps> } {
   const bucket = Math.max(1, Math.floor(rangeSec / 300));
   const end = lastTs(s, now);
   const out: Point[] = [];
-  for (let t = Math.ceil((now - rangeSec) / bucket) * bucket; t <= end; t += bucket) out.push({ t, ...sample(s, t) });
-  return { points: out, bucket };
+  for (let t = Math.ceil((now - rangeSec) / bucket) * bucket; t <= end; t += bucket) out.push({ t, ...sample(s, t), apps: programs(s, t) });
+  return { points: out, bucket, report: summarizeApps(rawPoints(s, rangeSec, end), out) };
 }
 
 const RANGE_SEC: Record<string, number> = { "15m": 900, "1h": 3600, "6h": 21600, "24h": 86400, "7d": 604800, "30d": 2592000 };
@@ -65,7 +94,7 @@ export const demoApi: Api = {
         spark.push(t > last ? null : sample(s, t).cpu);
       }
       const days = 6 + s.id * 3, perDay = 0.9e6 * (0.8 + (s.id % 3) * 0.2);
-      return { uptime: s.offlineMin ? null : (s.id * 3 + 2) * 86400 + 3600 * (s.id + 1) + (now % 3600), usage: { up: Math.round(days * perDay), down: Math.round(days * perDay * 0.12), up24h: s.offlineMin ? 0 : Math.round(perDay) }, id: String(s.id), created_at: s.id, name: s.name, os: s.os, online: now - last < 60, last_seen: last, latest: { ...sample(s, last) }, cpu_spark: spark };
+      return { uptime: s.offlineMin ? null : (s.id * 3 + 2) * 86400 + 3600 * (s.id + 1) + (now % 3600), usage: { up: Math.round(days * perDay), down: Math.round(days * perDay * 0.12), up24h: s.offlineMin ? 0 : Math.round(perDay) }, id: String(s.id), created_at: s.id, name: s.name, os: s.os, online: now - last < 60, last_seen: last, latest: { ...sample(s, last) }, apps: programs(s, last) ?? null, cpu_spark: spark };
     });
     return delay({ hosts, now });
   },

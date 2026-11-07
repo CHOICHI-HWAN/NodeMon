@@ -75,7 +75,11 @@ await denied("a non-numeric usage total is rejected", db(dev, "PUT", `latest/${d
 await ok("latest may carry the computer uptime", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, ut: 86400 }));
 await denied("a negative uptime is rejected", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, ut: -5 }));
 await denied("a non-numeric uptime is rejected", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, ut: "long" }));
+await ok("latest may carry the biggest programs", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, ap: "postgres:80.5:900|nginx:12.3:150" }));
+await denied("the programs must be text", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, ap: { a: 1 } }));
+await denied("an oversized programs text is rejected", db(dev, "PUT", `latest/${dev.uid}`, { ...sample, ts: now, ap: "x".repeat(601) }));
 await ok("device writes a minute bucket", db(dev, "PUT", `m/${dev.uid}/20261029/1793280000`, { ...sample, t: 1793280000 }));
+await ok("a minute bucket may carry the biggest programs", db(dev, "PUT", `m/${dev.uid}/20261029/1793280060`, { ...sample, t: 1793280060, ap: "postgres:80.5:900" }));
 await ok("device writes an hour bucket", db(dev, "PUT", `h/${dev.uid}/202610/1793278800`, { ...sample, t: 1793278800 }));
 await ok("an hour bucket may carry usage totals", db(dev, "PUT", `h/${dev.uid}/202610/1793282400`, { ...sample, t: 1793282400, up: 5000, down: 900 }));
 await denied("malformed day key rejected", db(dev, "PUT", `m/${dev.uid}/today/1793280000`, { ...sample, t: 1793280000 }));
