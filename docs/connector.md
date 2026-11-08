@@ -50,7 +50,7 @@ chmod +x ./nodemon-connector-linux-amd64 && ./nodemon-connector-linux-amd64 --fi
 - macOS가 "확인되지 않은 개발자"라고 막으면 `xattr -d com.apple.quarantine ./파일이름`, `Killed: 9`로 종료되면 `codesign -s - ./파일이름`을 실행하세요.
 - Windows가 "PC를 보호했습니다"라고 하면 **추가 정보 → 실행**을 누르세요.
 
-**5. 켤 때마다 자동 실행** — 등록이 성공한 뒤 대시보드 창의 "자동 실행 설정 보기"에 나오는 명령을 실행합니다. Linux는 systemd 서비스, macOS는 launchd, Windows는 작업 스케줄러(로그인할 때 실행)로 등록합니다. macOS와 Windows 방법은 아직 실제 장비에서 검증하지 못했습니다.
+**5. 켤 때마다 자동 실행** — 등록이 성공한 뒤 대시보드 창의 "자동 실행 설정 보기"에 나오는 명령을 실행합니다. Linux는 systemd 서비스, macOS는 launchd, Windows는 작업 스케줄러(로그인할 때 실행)로 등록합니다. Linux와 macOS 방법은 실제 장비에서 동작을 확인했고, Windows 방법은 아직 실제 장비에서 검증하지 못했습니다.
 
 ## 가동 시간(uptime) 표시
 컴퓨터가 마지막으로 켜진 뒤 얼마나 지났는지를 **노드** 표의 "가동 시간" 열과 노드 상세의 "가동 시간" 타일(부팅 시각 포함)에 보여 줍니다.

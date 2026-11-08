@@ -161,7 +161,7 @@ export function AddHost({ onClose }: { onClose: () => void }) {
               <summary>자동 실행 설정 보기</summary>
               <p className="sub">4번에서 등록이 성공한 뒤에 하세요. 등록할 때 저장된 자격 증명을 그대로 씁니다.</p>
               <Cmd text={autostartScript(os, file)} />
-              {os !== "linux" && (
+              {os === "windows" && (
                 <p className="sub">※ 이 방법은 아직 실제 {OS_LABEL[os]} 장비에서 검증하지 못했습니다. 동작하지 않으면 알려 주세요.</p>
               )}
             </details>
