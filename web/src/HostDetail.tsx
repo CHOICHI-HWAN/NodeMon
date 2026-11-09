@@ -15,9 +15,10 @@ type Props = {
   range: RangeKey;
   paused: boolean;
   onDeleted: () => void;
+  onRename: () => void;
 };
 
-export function HostDetail({ host, color, now, range, paused, onDeleted }: Props) {
+export function HostDetail({ host, color, now, range, paused, onDeleted, onRename }: Props) {
   const id = host?.id ?? "";
   const sec = RANGES.find((r) => r.key === range)!.sec;
   const { data, loading } = usePoll(
@@ -48,6 +49,8 @@ export function HostDetail({ host, color, now, range, paused, onDeleted }: Props
       <div className="node-head">
         <span className="key" style={{ background: color }} />
         <h2>{host.name}</h2>
+        {host.alias && host.hostname && <span className="muted">({host.hostname})</span>}
+        {!DEMO && <button className="link" onClick={onRename} title="표시 이름 바꾸기">이름 바꾸기</button>}
         <Status online={host.online} />
         <span className="muted">{host.os} · 마지막 수신 {fmtAgo(host.last_seen, now)}{host.connector ? ` · Connector ${host.connector}` : ""}</span>
         {olderThan(host.connector, APP_VERSION) && <span className="badge-old" title="대시보드보다 오래된 버전입니다. 새 Connector로 바꾸면 최신 기능을 쓸 수 있습니다.">구버전</span>}

@@ -90,6 +90,13 @@ export function buildRules(emails) {
       // users/<owner>/devices/<device> is the index the dashboard lists from.
       users: {
         $uid: {
+          aliases: {
+            ".read": "auth != null && auth.uid === $uid",
+            $dev: {
+              ".write": "auth != null && auth.uid === $uid",
+              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60",
+            },
+          },
           devices: {
             ".read": "auth != null && auth.uid === $uid",
             $dev: {
@@ -104,6 +111,7 @@ export function buildRules(emails) {
         },
       },
 
+      // users/<owner>/aliases/<device> is the nickname the owner gave a computer in the dashboard (the owner only).
       latest: {
         $dev: {
           ".read": readByOwner,

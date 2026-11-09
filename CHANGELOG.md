@@ -7,6 +7,9 @@ NodeMon is an independent project, not affiliated with Netdata, Inc.
 
 ## [Unreleased]
 
+### Added
+- Nicknames: a computer can be given a display name in the dashboard (the pencil on the Nodes list, or "이름 바꾸기" on its page). It is stored under `users/<owner>/aliases` and needs the new security rules deployed.
+
 ## [0.1.0] - 2026-11-08
 
 First release. NodeMon shows the resource usage of one or many computers on a dashboard that runs on the free

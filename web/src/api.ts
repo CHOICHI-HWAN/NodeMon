@@ -16,7 +16,9 @@ export type Sample = {
 export type Host = {
   id: string;
   created_at: number; // registration order decides a computer's color, so colors never shift when others are added
-  name: string;
+  name: string; // what the dashboard shows: the nickname if the owner set one, else the computer's own name
+  hostname?: string; // the computer's own name, as the connector registered it
+  alias?: string | null; // the nickname the owner gave it
   os: string;
   online: boolean;
   last_seen: number;
@@ -65,6 +67,7 @@ export interface Api {
   overview(): Promise<{ hosts: Host[]; now: number }>;
   metrics(id: string, range: string): Promise<{ points: Point[]; bucket: number; report: AppsReport | null }>;
   deleteHost(id: string): Promise<void>;
+  renameHost(id: string, alias: string): Promise<void>; // an empty alias goes back to the computer's own name
   createCode(): Promise<EnrollCode>;
   logout(): Promise<void>;
 }
@@ -79,6 +82,7 @@ function lazyFirebase(): Api {
     overview: async () => (await load()).overview(),
     metrics: async (id, range) => (await load()).metrics(id, range),
     deleteHost: async (id) => (await load()).deleteHost(id),
+    renameHost: async (id, alias) => (await load()).renameHost(id, alias),
     createCode: async () => (await load()).createCode(),
     logout: async () => (await load()).logout(),
   };

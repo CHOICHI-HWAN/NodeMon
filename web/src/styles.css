@@ -150,6 +150,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .danger:hover { background: color-mix(in srgb, var(--critical) 12%, transparent); }
 .link { background: none; border: 0; padding: 2px 4px; color: var(--accent); font-weight: 500; }
 .link:hover { text-decoration: underline; }
+.link.small { font-size: 12px; }
+.hostname { font-size: 12px; }
 .seg { display: inline-flex; padding: 3px; gap: 2px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); box-shadow: var(--shadow-sm); }
 .seg button { background: none; border: 0; padding: 4px 14px; border-radius: 999px; color: var(--ink-2); font-weight: 500; transition: background 0.15s, color 0.15s; }
 .seg button:hover { background: var(--hover); color: var(--ink); }

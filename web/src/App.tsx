@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AddHost } from "./AddHost";
-import { api, OVERVIEW_POLL_MS, Unauthorized, type RangeKey, type User } from "./api";
+import { api, OVERVIEW_POLL_MS, Unauthorized, type Host, type RangeKey, type User } from "./api";
 import { demoState, type DemoMode } from "./demo";
 import { DEMO } from "./env";
 import { hostColors } from "./format";
@@ -49,7 +49,21 @@ function Dashboard({ user }: { user: User }) {
   const fast = watching || hostCount === 0;
   const { data, error } = usePoll(() => api.overview(), [mode], paused ? 0 : fast ? 5000 : OVERVIEW_POLL_MS);
   const [gone, setGone] = useState<ReadonlySet<string>>(new Set()); // deleted just now; the next refresh no longer lists them
-  const hosts = useMemo(() => (data?.hosts ?? []).filter((h) => !gone.has(h.id)), [data, gone]);
+  const [renamed, setRenamed] = useState<Readonly<Record<string, string>>>({}); // nicknames set just now, shown before the next refresh
+  const hosts = useMemo(
+    () => (data?.hosts ?? []).filter((h) => !gone.has(h.id)).map((h) => (h.id in renamed ? { ...h, alias: renamed[h.id] || null, name: renamed[h.id] || h.hostname || h.name } : h)),
+    [data, gone, renamed],
+  );
+  const rename = useCallback(async (h: Host) => {
+    const next = window.prompt(`'${h.hostname ?? h.name}' 의 표시 이름 (비우면 원래 이름으로 돌아갑니다)`, h.alias ?? "");
+    if (next == null) return;
+    try {
+      await api.renameHost(h.id, next);
+      setRenamed((r) => ({ ...r, [h.id]: next.trim().slice(0, 60) }));
+    } catch (e) {
+      window.alert(`이름을 바꾸지 못했습니다: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, []);
   const forget = useCallback((id: string) => setGone((g) => new Set(g).add(id)), []);
   useEffect(() => setHostCount(data ? hosts.length : -1), [data, hosts]);
   const openAdd = () => {
@@ -124,9 +138,9 @@ function Dashboard({ user }: { user: User }) {
             (page === "overview" ? (
               <Overview hosts={hosts} now={now} colors={colors} range={range} paused={paused} onAdd={openAdd} />
             ) : page === "nodes" ? (
-              <Nodes hosts={hosts} now={now} colors={colors} onDeleted={forget} />
+              <Nodes hosts={hosts} now={now} colors={colors} onDeleted={forget} onRename={rename} />
             ) : (
-              <HostDetail host={host} color={colors.get(host?.id ?? "") ?? "var(--series-1)"} now={now} range={range} paused={paused} onDeleted={() => { forget(host!.id); navigate("#/nodes"); }} />
+              <HostDetail host={host} color={colors.get(host?.id ?? "") ?? "var(--series-1)"} now={now} range={range} paused={paused} onDeleted={() => { forget(host!.id); navigate("#/nodes"); }} onRename={() => rename(host!)} />
             ))}
         </main>
       </div>

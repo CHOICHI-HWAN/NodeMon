@@ -12,7 +12,7 @@ type Filter = "all" | "live" | "offline";
 const val = (h: Host, k: SortKey) =>
   k === "name" ? h.name.toLowerCase() : !h.latest ? -1 : k === "cpu" ? h.latest.cpu : k === "mem" ? pct(h.latest.mem_used, h.latest.mem_total) : pct(h.latest.disk_used, h.latest.disk_total);
 
-export function Nodes({ hosts, now, colors, onDeleted }: { hosts: Host[]; now: number; colors: Map<string, string>; onDeleted: (id: string) => void }) {
+export function Nodes({ hosts, now, colors, onDeleted, onRename }: { hosts: Host[]; now: number; colors: Map<string, string>; onDeleted: (id: string) => void; onRename: (h: Host) => void }) {
   const [error, setError] = useState<string | null>(null);
   const remove = async (h: Host) => {
     if (!window.confirm(`'${h.name}' 을(를) 삭제할까요? 수집된 데이터도 함께 삭제됩니다.`)) return;
@@ -101,6 +101,8 @@ export function Nodes({ hosts, now, colors, onDeleted }: { hosts: Host[]; now: n
                       <span className="key" style={{ background: colors.get(h.id) }} />
                       {h.name}
                     </a>
+                    {h.alias && h.hostname && <span className="muted hostname"> ({h.hostname})</span>}
+                    {!DEMO && <button className="link small" onClick={() => onRename(h)} aria-label={`${h.name} 이름 바꾸기`} title="표시 이름 바꾸기">✎</button>}
                   </td>
                   <td className="muted">{h.os}</td>
                   <td>{l ? <Cell value={pct(l.cpu, 100)} label="CPU" /> : "–"}</td>
