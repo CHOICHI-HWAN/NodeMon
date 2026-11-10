@@ -71,6 +71,14 @@ export function HostDetail({ host, color, now, range, paused, onDeleted, onRenam
               sub={`부팅 ${fmtDateTime(now - host.uptime)}`}
             />
           )}
+          {pts.length > 0 && data?.bucket && (
+            <Tile
+              label={`${RANGES.find((r) => r.key === range)?.label ?? ""} 송수신 총량`}
+              hint="선택한 기간의 평균 속도에 시간을 곱해 합친 추정치입니다. 수집이 끊긴 시간은 0으로 칩니다."
+              value={<span className="net-val">↓ {fmtBytes(pts.reduce((t, p) => t + p.net_rx * data.bucket, 0))}</span>}
+              sub={`↑ ${fmtBytes(pts.reduce((t, p) => t + p.net_tx * data.bucket, 0))}`}
+            />
+          )}
           {host.usage && (
             <Tile
               label="업로드 총량"

@@ -7,7 +7,12 @@ NodeMon is an independent project, not affiliated with Netdata, Inc.
 
 ## [Unreleased]
 
+### Fixed
+- Network speed was read as a single second out of every ten, so bursty traffic was missed; the connector now asks Netdata for the average over the whole measuring interval.
+- macOS: Netdata has no `system.net` chart there, so the network columns stayed empty. The physical interfaces are now added up (loopback, tunnels and bridges are left out).
+
 ### Added
+- The computer page shows the data sent and received over the selected period (an estimate: average speed times time).
 - Nicknames: a computer can be given a display name in the dashboard (the pencil on the Nodes list, or "이름 바꾸기" on its page). It is stored under `users/<owner>/aliases` and needs the new security rules deployed.
 
 ## [0.1.0] - 2026-11-08

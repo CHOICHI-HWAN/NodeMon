@@ -5,6 +5,7 @@ package main
 import (
 	"encoding/json"
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -69,5 +70,31 @@ func TestMacRamFallbackAndMissingCharts(t *testing.T) {
 func TestNoCPUChart(t *testing.T) {
 	if _, err := toSample(map[string]ndChart{}); err == nil {
 		t.Error("expected error")
+	}
+}
+
+const macNetFixture = `{
+ "system.cpu": {"dimensions": {"idle": {"value": 80}}},
+ "net.en0": {"dimensions": {"received": {"value": 800}, "sent": {"value": -400}}},
+ "net.en1": {"dimensions": {"received": {"value": 80}, "sent": {"value": 0}}},
+ "net.lo0": {"dimensions": {"received": {"value": 9999}, "sent": {"value": -9999}}},
+ "net.utun3": {"dimensions": {"received": {"value": 9999}, "sent": {"value": -9999}}}
+}`
+
+// macOS has no system.net: the physical interfaces are added up and tunnels/loopback are left out.
+func TestNetFromInterfacesWhenNoTotal(t *testing.T) {
+	s := parse(t, macNetFixture)
+	if !near(s.NetRx, 110000) || !near(s.NetTx, 50000) {
+		t.Errorf("net = %v/%v", s.NetRx, s.NetTx)
+	}
+}
+
+func TestParseNetAverage(t *testing.T) {
+	rx, tx, ok := parseNetAverage(strings.NewReader(`{"labels":["time","received","sent"],"data":[[1794317260,800,-400]]}`))
+	if !ok || !near(rx, 100000) || !near(tx, 50000) {
+		t.Errorf("got %v/%v ok=%v", rx, tx, ok)
+	}
+	if _, _, ok := parseNetAverage(strings.NewReader(`{"labels":["time","received","sent"],"data":[]}`)); ok {
+		t.Error("an empty answer must not count as a reading")
 	}
 }
