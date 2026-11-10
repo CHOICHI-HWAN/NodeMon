@@ -103,6 +103,7 @@ export const demoApi: Api = {
     return delay(points(s, RANGE_SEC[range] ?? 3600, Math.floor(Date.now() / 1000)));
   },
   deleteHost: () => delay<void>(undefined),
+  renameHost: () => delay<void>(undefined),
   createCode: () => delay({ code: "7KQ4-M9XD-2WHP", expires_at: Math.floor(Date.now() / 1000) + 900, args: "--firebase-api-key AIza… --firebase-db-url https://your-project-default-rtdb.firebaseio.com --code 7KQ4-M9XD-2WHP" }),
   logout: () => delay<void>(undefined),
 };

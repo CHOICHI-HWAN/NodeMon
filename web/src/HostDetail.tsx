@@ -15,9 +15,10 @@ type Props = {
   range: RangeKey;
   paused: boolean;
   onDeleted: () => void;
+  onRename: () => void;
 };
 
-export function HostDetail({ host, color, now, range, paused, onDeleted }: Props) {
+export function HostDetail({ host, color, now, range, paused, onDeleted, onRename }: Props) {
   const id = host?.id ?? "";
   const sec = RANGES.find((r) => r.key === range)!.sec;
   const { data, loading } = usePoll(
@@ -48,6 +49,8 @@ export function HostDetail({ host, color, now, range, paused, onDeleted }: Props
       <div className="node-head">
         <span className="key" style={{ background: color }} />
         <h2>{host.name}</h2>
+        {host.alias && host.hostname && <span className="muted">({host.hostname})</span>}
+        {!DEMO && <button className="link" onClick={onRename} title="표시 이름 바꾸기">이름 바꾸기</button>}
         <Status online={host.online} />
         <span className="muted">{host.os} · 마지막 수신 {fmtAgo(host.last_seen, now)}{host.connector ? ` · Connector ${host.connector}` : ""}</span>
         {olderThan(host.connector, APP_VERSION) && <span className="badge-old" title="대시보드보다 오래된 버전입니다. 새 Connector로 바꾸면 최신 기능을 쓸 수 있습니다.">구버전</span>}
@@ -66,6 +69,14 @@ export function HostDetail({ host, color, now, range, paused, onDeleted }: Props
               hint="컴퓨터가 마지막으로 켜진 뒤 지난 시간입니다."
               value={<span className="net-val">{fmtUptime(host.uptime)}</span>}
               sub={`부팅 ${fmtDateTime(now - host.uptime)}`}
+            />
+          )}
+          {pts.length > 0 && data?.bucket && (
+            <Tile
+              label={`${RANGES.find((r) => r.key === range)?.label ?? ""} 송수신 총량`}
+              hint="선택한 기간의 평균 속도에 시간을 곱해 합친 추정치입니다. 수집이 끊긴 시간은 0으로 칩니다."
+              value={<span className="net-val">↓ {fmtBytes(pts.reduce((t, p) => t + p.net_rx * data.bucket, 0))}</span>}
+              sub={`↑ ${fmtBytes(pts.reduce((t, p) => t + p.net_tx * data.bucket, 0))}`}
             />
           )}
           {host.usage && (

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"os/signal"
@@ -54,6 +55,7 @@ type runner struct {
 	out     *fbSink
 	store   *credStore
 	logs    *quietLog
+	every   time.Duration // how often a measurement is taken: the window the traffic average covers
 }
 
 // tick takes one measurement, hands it to the sink and keeps the saved credentials current.
@@ -67,6 +69,9 @@ func (r *runner) tick() {
 	if err != nil {
 		r.logs.problem("netdata", "netdata: %v", err)
 		return
+	}
+	if rx, tx, ok := fetchNetAverage(r.client, r.netdata, netChartIDs(charts), int(math.Ceil(r.every.Seconds()))); ok {
+		s.NetRx, s.NetTx = rx, tx
 	}
 	r.logs.recovered("netdata", "netdata: readings are coming through again")
 	withUptime(&s)
@@ -145,5 +150,5 @@ func newRunner(o options) (*runner, error) {
 	out := newFBSink(fc, o.upload)
 	out.usage = usage
 	log.Printf("measuring %s every %s, uploading every %s", o.netdata, o.interval, o.upload)
-	return &runner{client: local, netdata: o.netdata, out: out, store: newCredStore(o.cfgPath, &cfg, usage), logs: newQuietLog(10 * time.Minute)}, nil
+	return &runner{client: local, netdata: o.netdata, out: out, store: newCredStore(o.cfgPath, &cfg, usage), logs: newQuietLog(10 * time.Minute), every: o.interval}, nil
 }

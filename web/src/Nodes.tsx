@@ -12,7 +12,7 @@ type Filter = "all" | "live" | "offline";
 const val = (h: Host, k: SortKey) =>
   k === "name" ? h.name.toLowerCase() : !h.latest ? -1 : k === "cpu" ? h.latest.cpu : k === "mem" ? pct(h.latest.mem_used, h.latest.mem_total) : pct(h.latest.disk_used, h.latest.disk_total);
 
-export function Nodes({ hosts, now, colors, onDeleted }: { hosts: Host[]; now: number; colors: Map<string, string>; onDeleted: (id: string) => void }) {
+export function Nodes({ hosts, now, colors, onDeleted, onRename }: { hosts: Host[]; now: number; colors: Map<string, string>; onDeleted: (id: string) => void; onRename: (h: Host) => void }) {
   const [error, setError] = useState<string | null>(null);
   const remove = async (h: Host) => {
     if (!window.confirm(`'${h.name}' 을(를) 삭제할까요? 수집된 데이터도 함께 삭제됩니다.`)) return;
@@ -56,6 +56,12 @@ export function Nodes({ hosts, now, colors, onDeleted }: { hosts: Host[]; now: n
     <>
       <div className="filters">
         <input className="search" type="search" placeholder="노드 검색" aria-label="노드 검색" value={q} onChange={(e) => setQ(e.target.value)} />
+        <select className="select sort-select" aria-label="정렬" value={`${sort.key}`} onChange={(e) => { const key = e.target.value as SortKey; setSort({ key, dir: key === "name" ? 1 : -1 }); }}>
+          <option value="name">이름순</option>
+          <option value="cpu">CPU 높은 순</option>
+          <option value="mem">메모리 높은 순</option>
+          <option value="disk">디스크 높은 순</option>
+        </select>
         <div className="seg" role="group" aria-label="상태">
           {(
             [
@@ -95,21 +101,23 @@ export function Nodes({ hosts, now, colors, onDeleted }: { hosts: Host[]; now: n
               const l = h.latest;
               return (
                 <tr key={h.id} className={h.online ? "" : "offline"}>
-                  <td><Status online={h.online} /></td>
-                  <td>
+                  <td className="c-status"><Status online={h.online} /></td>
+                  <td className="c-name">
                     <a className="node-link" href={`#/host/${encodeURIComponent(h.id)}`}>
                       <span className="key" style={{ background: colors.get(h.id) }} />
                       {h.name}
                     </a>
+                    {h.alias && h.hostname && <span className="muted hostname"> ({h.hostname})</span>}
+                    {!DEMO && <button className="link small" onClick={() => onRename(h)} aria-label={`${h.name} 이름 바꾸기`} title="표시 이름 바꾸기">✎</button>}
                   </td>
-                  <td className="muted">{h.os}</td>
-                  <td>{l ? <Cell value={pct(l.cpu, 100)} label="CPU" /> : "–"}</td>
-                  <td className="spark-cell"><Sparkline values={h.cpu_spark} color={colors.get(h.id) ?? "var(--series-1)"} /></td>
-                  <td>{l ? <Cell value={pct(l.mem_used, l.mem_total)} label="메모리" /> : "–"}</td>
-                  <td>{l ? <Cell value={pct(l.disk_used, l.disk_total)} label="디스크" /> : "–"}</td>
-                  <td className="net-cell">{l ? <>↓ {fmtRate(l.net_rx)}<br />↑ {fmtRate(l.net_tx)}</> : "–"}</td>
+                  <td className="muted c-os">{h.os}</td>
+                  <td data-label="CPU">{l ? <Cell value={pct(l.cpu, 100)} label="CPU" /> : "–"}</td>
+                  <td className="spark-cell c-spark"><Sparkline values={h.cpu_spark} color={colors.get(h.id) ?? "var(--series-1)"} /></td>
+                  <td data-label="메모리">{l ? <Cell value={pct(l.mem_used, l.mem_total)} label="메모리" /> : "–"}</td>
+                  <td data-label="디스크">{l ? <Cell value={pct(l.disk_used, l.disk_total)} label="디스크" /> : "–"}</td>
+                  <td className="net-cell" data-label="네트워크">{l ? <>↓ {fmtRate(l.net_rx)}<br />↑ {fmtRate(l.net_tx)}</> : "–"}</td>
                   {showUsage && (
-                  <td>
+                  <td data-label="업로드">
                     {h.usage ? (
                       <div className="usage-cell">
                         <strong>{fmtBytes(h.usage.up)}</strong>
@@ -120,15 +128,15 @@ export function Nodes({ hosts, now, colors, onDeleted }: { hosts: Host[]; now: n
                     )}
                   </td>
                   )}
-                  {showUptime && <td>{h.uptime != null ? fmtUptime(h.uptime) : "–"}</td>}
+                  {showUptime && <td data-label="가동 시간">{h.uptime != null ? fmtUptime(h.uptime) : "–"}</td>}
                   {showVersion && (
-                    <td className="muted">
+                    <td className="muted" data-label="Connector">
                       {h.connector ?? "–"}
                       {olderThan(h.connector, APP_VERSION) && <span className="badge-old" title="대시보드보다 오래된 버전입니다. 새 Connector로 바꾸면 최신 기능을 쓸 수 있습니다.">구버전</span>}
                     </td>
                   )}
-                  <td className="muted">{fmtAgo(h.last_seen, now)}</td>
-                  {!DEMO && <td><button className="danger small" onClick={() => remove(h)} aria-label={`${h.name} 삭제`}>삭제</button></td>}
+                  <td className="muted" data-label="마지막 수신">{fmtAgo(h.last_seen, now)}</td>
+                  {!DEMO && <td className="c-del"><button className="danger small" onClick={() => remove(h)} aria-label={`${h.name} 삭제`}>삭제</button></td>}
                 </tr>
               );
             })}

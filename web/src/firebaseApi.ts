@@ -208,6 +208,7 @@ export const firebaseApi: Api = {
   async overview() {
     const u = requireUser();
     const idx = ((await get(ref(fb().db, `users/${u.uid}/devices`))).val() ?? {}) as Record<string, { name: string; os: string; createdAt?: number }>;
+    const aliases = ((await get(ref(fb().db, `users/${u.uid}/aliases`))).val() ?? {}) as Record<string, string>;
     const nowMs = serverNowMs();
     const nowSec = Math.floor(nowMs / 1000);
     const hosts: Host[] = await Promise.all(
@@ -218,7 +219,9 @@ export const firebaseApi: Api = {
         return {
           id,
           created_at: d.createdAt ?? 0,
-          name: d.name,
+          name: aliases[id] || d.name,
+          hostname: d.name,
+          alias: aliases[id] || null,
           os: d.os,
           online: latest != null && nowMs - latest.ts < graceMs,
           // The upload carries the uptime at upload time; add what has passed since, so it is right between uploads.
@@ -257,9 +260,18 @@ export const firebaseApi: Api = {
   async deleteHost(id) {
     const u = requireUser();
     // The device record goes last: the rules use it to decide that you own the other nodes.
+    await remove(ref(fb().db, `users/${u.uid}/aliases/${id}`));
     for (const path of [`users/${u.uid}/devices/${id}`, `latest/${id}`, `m/${id}`, `h/${id}`, `devices/${id}`]) {
       await remove(ref(fb().db, path));
     }
+  },
+
+  async renameHost(id, alias) {
+    const u = requireUser();
+    const path = ref(fb().db, `users/${u.uid}/aliases/${id}`);
+    const v = alias.trim();
+    if (v) await set(path, v.slice(0, 60));
+    else await remove(path);
   },
 
   async createCode() {

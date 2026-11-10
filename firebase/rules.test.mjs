@@ -92,6 +92,13 @@ await denied("owner cannot forge samples", db(owner, "PUT", `latest/${dev.uid}`,
 console.log("-- reading");
 await ok("owner reads latest", db(owner, "GET", `latest/${dev.uid}`));
 await ok("owner reads a day with a key range", db(owner, "GET", `m/${dev.uid}/20261029`, undefined, '&orderBy="$key"&startAt="1793000000"'));
+await ok("owner sets a nickname", db(owner, "PUT", `users/${owner.uid}/aliases/${dev.uid}`, "스튜디오"));
+await ok("owner reads own nicknames", db(owner, "GET", `users/${owner.uid}/aliases`));
+await denied("nickname cannot be empty or too long", db(owner, "PUT", `users/${owner.uid}/aliases/${dev.uid}`, "x".repeat(61)));
+await denied("other user cannot set a nickname on the owner's computers", db(other, "PUT", `users/${owner.uid}/aliases/${dev.uid}`, "x"));
+await denied("other user cannot read the owner's nicknames", db(other, "GET", `users/${owner.uid}/aliases`));
+await denied("a device cannot set nicknames", db(dev, "PUT", `users/${owner.uid}/aliases/${dev.uid}`, "x"));
+await ok("owner removes a nickname", db(owner, "DELETE", `users/${owner.uid}/aliases/${dev.uid}`));
 await ok("owner lists own devices", db(owner, "GET", `users/${owner.uid}/devices`));
 await ok("owner reads own device record", db(owner, "GET", `devices/${dev.uid}`));
 await ok("a device can list its own history", db(dev, "GET", `m/${dev.uid}`, undefined, "&shallow=true"));
