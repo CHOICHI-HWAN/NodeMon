@@ -100,6 +100,15 @@ export function LineChart({ title, xs, series, fmt, from, to, max, height = 180,
     setLocal(false);
     setShared(null);
   };
+  // On a touchscreen there is no hover: a tap or a sideways drag picks a time, and the reading stays until you tap elsewhere.
+  useEffect(() => {
+    if (!local) return;
+    const away = (e: PointerEvent) => {
+      if (e.pointerType === "touch" && !wrap.current?.contains(e.target as Node)) leave();
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [local]); // eslint-disable-line react-hooks/exhaustive-deps
   const onKey = (e: React.KeyboardEvent) => {
     if (!xs.length) return;
     const cur = hi ?? (e.key === "ArrowLeft" ? xs.length : -1);
@@ -204,7 +213,7 @@ export function LineChart({ title, xs, series, fmt, from, to, max, height = 180,
                   )}
                 </g>
               )}
-              <rect x={M.l} y={M.t} width={iw} height={ih} fill="transparent" onPointerMove={onMove} onPointerLeave={leave} />
+              <rect x={M.l} y={M.t} width={iw} height={ih} fill="transparent" style={{ touchAction: "pan-y" }} onPointerDown={onMove} onPointerMove={onMove} onPointerLeave={(e) => (e.pointerType === "touch" ? undefined : leave())} />
             </svg>
             {xs.length === 0 && <div className="empty">{loading ? "불러오는 중…" : "이 기간에 수집된 데이터가 없습니다"}</div>}
             {hi != null && local && (
