@@ -7,6 +7,8 @@ NodeMon is an independent project, not affiliated with Netdata, Inc.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-11
+
 ### Fixed
 - Network speed was read as a single second out of every ten, so bursty traffic was missed; the connector now asks Netdata for the average over the whole measuring interval.
 - macOS: Netdata has no `system.net` chart there, so the network columns stayed empty. The physical interfaces are now added up (loopback, tunnels and bridges are left out).
@@ -63,5 +65,6 @@ Firebase Spark plan, using the free Netdata Agent as the data source.
 ### Removed
 - The self-hosted server option (Go server, Docker files). The last commit that contains it is `3dd3617`.
 
-[Unreleased]: https://github.com/CHOICHI-HWAN/NodeMon/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/CHOICHI-HWAN/NodeMon/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/CHOICHI-HWAN/NodeMon/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/CHOICHI-HWAN/NodeMon/releases/tag/v0.1.0
