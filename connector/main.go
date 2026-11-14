@@ -28,6 +28,10 @@ func main() {
 		fmt.Printf("nodemon-connector %s (%s/%s, %s)\n", version, runtime.GOOS, runtime.GOARCH, runtime.Version())
 		return
 	}
+	if o.tray {
+		runTray(o) // measures in the background while the icon runs; returns only by ending the process
+		return
+	}
 	r, err := newRunner(o)
 	if err != nil {
 		log.Fatal(err)

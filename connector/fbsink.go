@@ -99,6 +99,7 @@ type fbSink struct {
 	usage       *usageCounter  // when set, running totals are uploaded with the latest value and hour buckets
 	retry       backoff
 	lastAttempt time.Time
+	lastSent    time.Time // when an upload last succeeded
 	lastPruned  time.Time
 }
 
@@ -154,6 +155,7 @@ func (s *fbSink) flush(now time.Time) error {
 	}
 	s.queue = map[string]any{}
 	s.retry.fails = 0
+	s.lastSent = now
 	s.pruneIfDue(now)
 	return nil
 }
