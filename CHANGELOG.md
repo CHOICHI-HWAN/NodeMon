@@ -7,6 +7,8 @@ NodeMon is an independent project, not affiliated with Netdata, Inc.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-14
+
 ### Added
 - Windows: `--tray` runs the connector as a small icon next to the clock instead of a console window. The icon's color shows the state (green: uploading, amber: a problem, red: could not start), hovering shows the last upload time, and right-clicking offers "대시보드 열기" (with `--dashboard <address>`), "로그 보기" and "종료". The log goes to `connector.log` next to the saved credentials. A second copy started by mistake exits at once.
 
@@ -71,6 +73,7 @@ Firebase Spark plan, using the free Netdata Agent as the data source.
 ### Removed
 - The self-hosted server option (Go server, Docker files). The last commit that contains it is `3dd3617`.
 
-[Unreleased]: https://github.com/CHOICHI-HWAN/NodeMon/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/CHOICHI-HWAN/NodeMon/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/CHOICHI-HWAN/NodeMon/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/CHOICHI-HWAN/NodeMon/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/CHOICHI-HWAN/NodeMon/releases/tag/v0.1.0
