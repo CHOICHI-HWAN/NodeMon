@@ -60,7 +60,8 @@ export const BUILD_LOCAL = "cd connector && go build -o nodemon-connector . && c
 const lines = (...l: string[]) => l.join("\n");
 
 // Commands that keep the connector running after a reboot. They reuse the credentials the first run saved.
-export function autostartScript(os: Os, file: string): string {
+// dashboard is this site's address, which the Windows tray icon's menu opens.
+export function autostartScript(os: Os, file: string, dashboard: string): string {
   if (os === "linux") {
     return lines(
       `sudo install -m 755 ./${file} /usr/local/bin/nodemon-connector`,
@@ -104,7 +105,9 @@ export function autostartScript(os: Os, file: string): string {
   return lines(
     "mkdir C:\\nodemon",
     `copy .\\${file} C:\\nodemon\\nodemon-connector.exe`,
-    'schtasks /Create /TN "NodeMon Connector" /TR "C:\\nodemon\\nodemon-connector.exe" /SC ONLOGON /F',
+    `schtasks /Create /TN "NodeMon Connector" /TR "C:\\nodemon\\nodemon-connector.exe --tray --dashboard ${dashboard}" /SC ONLOGON /F`,
+    // Task Scheduler would otherwise stop it after 3 days, skip it on battery, and leave it off after a crash.
+    'Set-ScheduledTask -TaskName "NodeMon Connector" -Settings (New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1))',
     'schtasks /Run /TN "NodeMon Connector"',
   );
 }

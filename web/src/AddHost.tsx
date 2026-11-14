@@ -160,9 +160,13 @@ export function AddHost({ onClose }: { onClose: () => void }) {
             <details className="help">
               <summary>자동 실행 설정 보기</summary>
               <p className="sub">4번에서 등록이 성공한 뒤에 하세요. 등록할 때 저장된 자격 증명을 그대로 씁니다.</p>
-              <Cmd text={autostartScript(os, file)} />
+              <Cmd text={autostartScript(os, file, window.location.origin)} />
               {os === "windows" && (
-                <p className="sub">※ 이 방법은 아직 실제 {OS_LABEL[os]} 장비에서 검증하지 못했습니다. 동작하지 않으면 알려 주세요.</p>
+                <p className="sub">
+                  로그인할 때 창 없이 시계 옆 아이콘으로 실행됩니다. 아이콘 색이 상태(초록 정상, 노랑 문제, 빨강 멈춤)이고, 오른쪽 클릭하면
+                  마지막 업로드 시각, 대시보드 열기, 로그 보기, 종료가 있습니다. Windows 11에서는 처음에 ^ 안에 숨겨져 있으니 작업 표시줄로 끌어다 놓으세요.
+                  ※ 이 방법은 아직 실제 {OS_LABEL[os]} 장비에서 충분히 검증하지 못했습니다. 동작하지 않으면 알려 주세요.
+                </p>
               )}
             </details>
           </>

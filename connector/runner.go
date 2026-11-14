@@ -45,6 +45,19 @@ func (q *quietLog) recovered(key, message string) {
 	}
 }
 
+// health is what the tray icon shows. It has its own lock so the icon never waits on a slow upload.
+type health struct {
+	mu       sync.Mutex
+	lastSent time.Time
+	problem  string // empty while measuring and uploading work
+}
+
+func (h *health) set(lastSent time.Time, problem string) {
+	h.mu.Lock()
+	h.lastSent, h.problem = lastSent, problem
+	h.mu.Unlock()
+}
+
 var errRejected = errors.New("the database rejected this computer's credentials; it may have been removed from the dashboard. Register it again with a new code")
 
 // runner repeats measure-and-send until the process is stopped.
@@ -56,6 +69,7 @@ type runner struct {
 	store   *credStore
 	logs    *quietLog
 	every   time.Duration // how often a measurement is taken: the window the traffic average covers
+	health  health
 }
 
 // tick takes one measurement, hands it to the sink and keeps the saved credentials current.
@@ -63,11 +77,13 @@ func (r *runner) tick() {
 	charts, err := fetchNetdata(r.client, r.netdata)
 	if err != nil {
 		r.logs.problem("netdata", "netdata: %v", err)
+		r.health.set(r.out.lastSent, "netdata: "+err.Error())
 		return
 	}
 	s, err := toSample(charts)
 	if err != nil {
 		r.logs.problem("netdata", "netdata: %v", err)
+		r.health.set(r.out.lastSent, "netdata: "+err.Error())
 		return
 	}
 	if rx, tx, ok := fetchNetAverage(r.client, r.netdata, netChartIDs(charts), int(math.Ceil(r.every.Seconds()))); ok {
@@ -75,12 +91,17 @@ func (r *runner) tick() {
 	}
 	r.logs.recovered("netdata", "netdata: readings are coming through again")
 	withUptime(&s)
+	problem := ""
 	if err := r.out.Push(s); err != nil {
 		if errors.Is(err, errDenied) {
 			err = errRejected
 		}
 		r.logs.problem("send", "send: %v", err)
+		problem = "send: " + err.Error()
+	} else if r.out.retry.fails > 0 {
+		problem = "send: waiting to retry" // between attempts after a failure, Push sends nothing and returns nil
 	}
+	r.health.set(r.out.lastSent, problem)
 	r.store.save(false)
 }
 
@@ -92,10 +113,15 @@ func (r *runner) onStop() {
 	go func() {
 		<-sigs
 		signal.Reset(os.Interrupt, syscall.SIGTERM)
-		r.mu.Lock()
-		r.store.save(true)
-		os.Exit(0)
+		r.stop()
 	}()
+}
+
+// stop waits for any upload in flight, saves the usage total and ends the process.
+func (r *runner) stop() {
+	r.mu.Lock()
+	r.store.save(true)
+	os.Exit(0)
 }
 
 func (r *runner) loop(interval time.Duration) {

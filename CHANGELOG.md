@@ -7,6 +7,12 @@ NodeMon is an independent project, not affiliated with Netdata, Inc.
 
 ## [Unreleased]
 
+### Added
+- Windows: `--tray` runs the connector as a small icon next to the clock instead of a console window. The icon's color shows the state (green: uploading, amber: a problem, red: could not start), hovering shows the last upload time, and right-clicking offers "대시보드 열기" (with `--dashboard <address>`), "로그 보기" and "종료". The log goes to `connector.log` next to the saved credentials. A second copy started by mistake exits at once.
+
+### Fixed
+- Windows autostart: the task the dashboard's command creates was stopped by Task Scheduler after 3 days, did not run on battery, and stayed off after a crash. The command now removes the time limit, allows battery power and restarts it after a minute, and starts the connector with `--tray`. Computers set up earlier keep the old task until the new command is run again.
+
 ## [0.1.1] - 2026-11-11
 
 ### Fixed

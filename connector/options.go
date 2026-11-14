@@ -29,6 +29,8 @@ type options struct {
 	interval    time.Duration
 	upload      time.Duration
 	compress    bool
+	tray        bool
+	dashboard   string
 	showVersion bool
 }
 
@@ -48,6 +50,8 @@ func parseOptions(args []string, errOut io.Writer) (options, error) {
 	fs.BoolVar(&o.compress, "compress", false, "experimental: gzip upload bodies; falls back to plain if the database refuses them")
 	fs.DurationVar(&o.upload, "upload-every", 3*time.Minute, "how often to upload; measurements in between are averaged locally")
 	fs.StringVar(&o.cfgPath, "config", defaultConfigPath(), "path of the saved credentials")
+	fs.BoolVar(&o.tray, "tray", false, "Windows: run as an icon next to the clock instead of a console window, logging to a file")
+	fs.StringVar(&o.dashboard, "dashboard", "", "dashboard address the tray icon's menu opens (with --tray)")
 	fs.BoolVar(&o.showVersion, "version", false, "print the version and exit")
 	fs.Usage = func() {
 		fmt.Fprintf(fs.Output(), "NodeMon connector: sends this computer's resource usage, read from a local Netdata Agent, to your NodeMon dashboard.\n"+
@@ -74,6 +78,14 @@ func (o options) validate() error {
 	// The database rules accept an upload interval of up to a day.
 	if o.upload < time.Second || o.upload > 24*time.Hour {
 		return fmt.Errorf("--upload-every must be between 1s and 24h (got %s)", o.upload)
+	}
+	if o.tray && !trayAvailable {
+		return errors.New("--tray is only available on Windows")
+	}
+	if o.dashboard != "" {
+		if err := checkSecureURL(o.dashboard); err != nil {
+			return fmt.Errorf("--dashboard: %w", err)
+		}
 	}
 	if o.code == "" {
 		return nil
