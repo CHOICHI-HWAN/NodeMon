@@ -65,6 +65,12 @@ chmod +x ./nodemon-connector-linux-amd64 && ./nodemon-connector-linux-amd64 --fi
 
 이전에 자동 실행을 설정한 컴퓨터는 새 Connector 파일로 바꾼 뒤 대시보드의 자동 실행 명령을 다시 실행하면 트레이 모드로 바뀝니다. 작업을 관리자 권한 PowerShell에서 만들었다면 다시 실행할 때도 관리자 권한이 필요합니다.
 
+**Linux·macOS 상태 아이콘 (선택)** — Linux는 시계 옆(알림 영역), macOS는 메뉴 막대에 작은 아이콘을 둘 수 있습니다. 아이콘 색이 상태입니다(초록 정상, 노랑 문제나 업로드 지연, 빨강 Connector가 멈춤·실행 안 됨, 회색 시작하는 중). 클릭하면 마지막 업로드 시각과 "대시보드 열기"가 나오고, "아이콘 끄기"는 아이콘만 끕니다(Connector는 계속 돕니다).
+- Connector는 화면 없이 도는 서비스(systemd, launchd)이므로 아이콘은 **별도 프로그램 `nodemon-tray`**입니다. Connector가 자격 증명 옆에 쓰는 `status.json`(마지막 업로드 시각, 문제, 30초마다 갱신되는 생존 신호)을 읽기만 하고, 측정이나 업로드는 하지 않습니다. 그래서 켜고 꺼도 업로드에는 영향이 없습니다. Linux는 `~/.config/nodemon/status.json`과 `/etc/nodemon/status.json`(대시보드의 systemd 설정이 쓰는 곳) 중 더 최근에 갱신된 것을 따릅니다.
+- 받은 ZIP에 `nodemon-tray-<os>-<arch>`가 함께 들어 있습니다(0.1.2부터). 컴퓨터 추가 창의 "상태 아이콘 달기" 명령이 설치와 로그인 시 자동 실행을 설정합니다. 직접 하려면 `nodemon-tray --dashboard <대시보드 주소>`를 실행하세요(`--status <경로>`로 상태 파일을 직접 지정할 수 있습니다).
+- **GNOME에서는 기본으로 이런 아이콘이 보이지 않습니다.** AppIndicator 확장을 켜야 합니다(Ubuntu는 `gnome-shell-extension-appindicator` 설치 후 확장 앱에서 켜기). KDE·Cinnamon·XFCE는 바로 보입니다.
+- Connector가 0.1.2보다 오래되면 `status.json`을 쓰지 않아 아이콘이 계속 빨강(멈춤)으로 보입니다. Connector도 새 파일로 바꿔 주세요.
+
 ## 가동 시간(uptime) 표시
 컴퓨터가 마지막으로 켜진 뒤 얼마나 지났는지를 **노드** 표의 "가동 시간" 열과 노드 상세의 "가동 시간" 타일(부팅 시각 포함)에 보여 줍니다.
 

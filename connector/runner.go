@@ -49,13 +49,15 @@ func (q *quietLog) recovered(key, message string) {
 type health struct {
 	mu       sync.Mutex
 	lastSent time.Time
-	problem  string // empty while measuring and uploading work
+	problem  string        // empty while measuring and uploading work
+	status   *statusWriter // also tells a separate tray icon program (see status.go)
 }
 
 func (h *health) set(lastSent time.Time, problem string) {
 	h.mu.Lock()
 	h.lastSent, h.problem = lastSent, problem
 	h.mu.Unlock()
+	h.status.write(lastSent, problem)
 }
 
 var errRejected = errors.New("the database rejected this computer's credentials; it may have been removed from the dashboard. Register it again with a new code")
@@ -176,5 +178,5 @@ func newRunner(o options) (*runner, error) {
 	out := newFBSink(fc, o.upload)
 	out.usage = usage
 	log.Printf("measuring %s every %s, uploading every %s", o.netdata, o.interval, o.upload)
-	return &runner{client: local, netdata: o.netdata, out: out, store: newCredStore(o.cfgPath, &cfg, usage), logs: newQuietLog(10 * time.Minute), every: o.interval}, nil
+	return &runner{client: local, netdata: o.netdata, out: out, store: newCredStore(o.cfgPath, &cfg, usage), logs: newQuietLog(10 * time.Minute), every: o.interval, health: health{status: newStatusWriter(o.cfgPath, o.upload)}}, nil
 }

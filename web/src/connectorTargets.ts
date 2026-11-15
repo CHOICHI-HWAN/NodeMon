@@ -54,6 +54,40 @@ export function downloadCommand(os: Os, arch: Arch): string {
     : `curl -fLO ${url} && unzip -o ${zip}`;
 }
 
+// The icon next to the clock (Linux) or in the menu bar (macOS). It only shows what the connector reports, so it is optional.
+// The ZIP holds it next to the connector as nodemon-tray-<os>-<arch>; Windows has the icon built in (--tray).
+const trayFile = (os: Os, arch: Arch) => `nodemon-tray-${os}-${arch}`;
+export function trayScript(os: Os, arch: Arch, dashboard: string): string {
+  const file = trayFile(os, arch);
+  if (os === "linux") {
+    return lines(
+      `sudo install -m 755 ./${file} /usr/local/bin/nodemon-tray`,
+      "mkdir -p ~/.config/autostart",
+      "tee ~/.config/autostart/nodemon-tray.desktop >/dev/null <<'EOF'",
+      "[Desktop Entry]",
+      "Type=Application",
+      "Name=NodeMon",
+      `Exec=/usr/local/bin/nodemon-tray --dashboard ${dashboard}`,
+      "X-GNOME-Autostart-enabled=true",
+      "EOF",
+      "(nohup /usr/local/bin/nodemon-tray --dashboard " + dashboard + " >/dev/null 2>&1 &)",
+    );
+  }
+  return lines(
+    `mkdir -p ~/nodemon && cp ./${file} ~/nodemon/nodemon-tray`,
+    "cat > ~/Library/LaunchAgents/com.nodemon.tray.plist <<EOF",
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
+    '<plist version="1.0"><dict>',
+    "  <key>Label</key><string>com.nodemon.tray</string>",
+    `  <key>ProgramArguments</key><array><string>$HOME/nodemon/nodemon-tray</string><string>--dashboard</string><string>${dashboard}</string></array>`,
+    "  <key>RunAtLoad</key><true/>",
+    "</dict></plist>",
+    "EOF",
+    "launchctl load -w ~/Library/LaunchAgents/com.nodemon.tray.plist",
+  );
+}
+
 export const BUILD_LOCAL = "cd connector && go build -o nodemon-connector . && cd ..";
 
 // The service definitions are built from lines so no heredoc terminator ever has to sit inside this source.

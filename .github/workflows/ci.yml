@@ -31,6 +31,24 @@ jobs:
       - name: Cross-compile every supported computer type
         run: node scripts/build-connector.mjs --out "$RUNNER_TEMP/dist"
 
+  tray:
+    name: Tray icon (Go)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tray/go.mod
+          cache-dependency-path: tray/go.sum
+      - name: Formatting, vet and tests
+        working-directory: tray
+        run: |
+          test -z "$(gofmt -l .)"
+          go vet ./...
+          go test ./...
+      - name: Cross-compile the Linux builds
+        run: node scripts/build-tray.mjs --only linux --out "$RUNNER_TEMP/dist"
+
   web:
     name: Dashboard (TypeScript)
     runs-on: ubuntu-latest
