@@ -15,6 +15,7 @@ import (
 type Params struct {
 	Top, Bottom color.RGBA // the tile's color fades from Top (upper left) to Bottom (lower right)
 	Corner      float64    // corner radius as a share of the size; 0 fills the whole square (what iOS wants, it rounds the corners itself)
+	Scale       float64    // how large the bars are drawn around the center (0 means 1); small icons use more of the tile
 	Dot         bool       // the live dot above the bars
 	DotColor    color.RGBA
 }
@@ -63,6 +64,10 @@ func Render(size int, p Params) *image.RGBA {
 	white := color.RGBA{0xff, 0xff, 0xff, 0xff}
 	radius := p.Corner * unit
 	scale := unit / float64(size)
+	glyph := p.Scale
+	if glyph == 0 {
+		glyph = 1
+	}
 	for py := 0; py < size; py++ {
 		for px := 0; px < size; px++ {
 			var r, g, b, cover float64
@@ -74,13 +79,14 @@ func Render(size int, p Params) *image.RGBA {
 						continue
 					}
 					c := mix(p.Top, p.Bottom, math.Min(1, math.Max(0, (x+y)/(2*unit))))
+					gx, gy := unit/2+(x-unit/2)/glyph, unit/2+(y-unit/2)/glyph // the bars live on the unscaled canvas
 					for _, bar := range bars {
-						if inRoundBar(x, y, bar) {
+						if inRoundBar(gx, gy, bar) {
 							c = white
 							break
 						}
 					}
-					if p.Dot && math.Hypot(x-404, y-134) <= 32 {
+					if p.Dot && math.Hypot(gx-404, gy-134) <= 32 {
 						c = p.DotColor
 					}
 					r, g, b, cover = r+float64(c.R), g+float64(c.G), b+float64(c.B), cover+1
