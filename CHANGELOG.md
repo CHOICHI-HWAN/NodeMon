@@ -7,6 +7,8 @@ NodeMon is an independent project, not affiliated with Netdata, Inc.
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-11-16
+
 ### Fixed
 - Windows: the tray icon no longer gives up with "Shell_NotifyIcon: Unspecified error" when it starts before the taskbar is ready (for example right at logon). It keeps trying every few seconds while the connector works, and notes the problem in connector.log.
 
@@ -84,7 +86,8 @@ Firebase Spark plan, using the free Netdata Agent as the data source.
 ### Removed
 - The self-hosted server option (Go server, Docker files). The last commit that contains it is `3dd3617`.
 
-[Unreleased]: https://github.com/CHOICHI-HWAN/NodeMon/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/CHOICHI-HWAN/NodeMon/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/CHOICHI-HWAN/NodeMon/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/CHOICHI-HWAN/NodeMon/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/CHOICHI-HWAN/NodeMon/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/CHOICHI-HWAN/NodeMon/compare/v0.1.0...v0.1.1
