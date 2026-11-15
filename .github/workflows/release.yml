@@ -15,8 +15,32 @@ permissions:
   contents: write
 
 jobs:
+  # The macOS icon program uses Apple's frameworks, so it can only be built on a Mac.
+  tray-macos:
+    name: Build the macOS menu bar icon
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tray/go.mod
+          cache-dependency-path: tray/go.sum
+      - name: Tag the build with the release version
+        env:
+          TAG: ${{ inputs.version || github.ref_name }}
+        run: git rev-parse -q --verify "refs/tags/$TAG" >/dev/null || git tag "$TAG"
+      - run: node scripts/build-tray.mjs --only darwin --out "$RUNNER_TEMP/tray"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tray-macos
+          path: ${{ runner.temp }}/tray/nodemon-tray-darwin-*
+          if-no-files-found: error
+
   release:
     name: Build and publish
+    needs: tray-macos
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,6 +65,14 @@ jobs:
         run: go test ./...
       - name: Build every computer type
         run: node scripts/build-connector.mjs --out "$RUNNER_TEMP/dist"
+      - name: Build the Linux icon program
+        run: node scripts/build-tray.mjs --only linux --out "$RUNNER_TEMP/dist"
+      - uses: actions/download-artifact@v4
+        with:
+          name: tray-macos
+          path: ${{ runner.temp }}/dist
+      - name: Make the downloaded programs executable
+        run: chmod +x "$RUNNER_TEMP"/dist/nodemon-tray-*
       - name: Pack one ZIP per computer type
         run: node scripts/package-release.mjs --in "$RUNNER_TEMP/dist" --out "$RUNNER_TEMP/release"
       - name: Publish the release

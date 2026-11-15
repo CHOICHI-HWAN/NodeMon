@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { api, type EnrollCode } from "./api";
 import {
-  ARCHES, autostartScript, BUILD_LOCAL, checkCommand, downloadCommand, downloadUrl, fileName, guessOs, OS_LABEL, RELEASES_URL, REPO_URL, runCommand, zipName,
+  ARCHES, autostartScript, BUILD_LOCAL, checkCommand, downloadCommand, downloadUrl, fileName, guessOs, OS_LABEL, RELEASES_URL, REPO_URL, runCommand, trayScript, zipName,
   type Arch, type Build, type Os,
 } from "./connectorTargets";
 
@@ -169,6 +169,22 @@ export function AddHost({ onClose }: { onClose: () => void }) {
                 </p>
               )}
             </details>
+            {os !== "windows" && build === "download" && (
+              <details className="help">
+                <summary>{os === "darwin" ? "메뉴 막대" : "시계 옆"}에 상태 아이콘 달기 (선택)</summary>
+                <p className="sub">
+                  Connector가 돌고 있는지, 업로드가 되는지를 {os === "darwin" ? "메뉴 막대" : "시계 옆"}의 작은 아이콘으로 보여 줍니다(초록 정상, 노랑 문제, 빨강 멈춤).
+                  내려받은 ZIP에 함께 들어 있고, Connector는 위 5번처럼 따로 실행해 두어야 합니다. 아이콘은 보여 주기만 하며 끄고 켜도 업로드에는 영향이 없습니다.
+                </p>
+                <Cmd text={trayScript(os, arch, window.location.origin)} />
+                {os === "linux" && (
+                  <p className="sub">
+                    GNOME은 기본으로 이런 아이콘을 보여 주지 않습니다. <strong>AppIndicator</strong> 확장을 켜야 합니다(예: Ubuntu는 <code>gnome-shell-extension-appindicator</code>를 설치하고 확장 앱에서 켜기).
+                    KDE·Cinnamon·XFCE 등은 바로 보입니다. ※ 아직 실제 장비에서 충분히 검증하지 못했습니다.
+                  </p>
+                )}
+              </details>
+            )}
           </>
         )}
       </div>

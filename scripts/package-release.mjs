@@ -29,7 +29,9 @@ for (const bin of binaries.sort()) {
   const stage = mkdtempSync(path.join(tmpdir(), "nodemon-pack-"));
   try {
     // The program keeps its full name (nodemon-connector-linux-amd64) so the commands in the dashboard match it.
-    for (const f of [bin]) copyFileSync(path.join(input, f), path.join(stage, f));
+    // Linux and macOS ZIPs also hold nodemon-tray (the icon next to the clock / in the menu bar) when it was built.
+    const tray = bin.replace("nodemon-connector-", "nodemon-tray-").replace(/\.exe$/, "");
+    for (const f of [bin, ...(readdirSync(input).includes(tray) ? [tray] : [])]) copyFileSync(path.join(input, f), path.join(stage, f));
     for (const f of ["LICENSE", "THIRD_PARTY_LICENSES.md"]) copyFileSync(path.join(root, f), path.join(stage, f));
     const zipPath = path.join(out, zipName);
     rmSync(zipPath, { force: true });
