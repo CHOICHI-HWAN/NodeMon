@@ -152,6 +152,7 @@ type tray struct {
 	iconState  int
 	taskbarMsg uint32
 	nid        notifyIconData
+	shown      bool // the icon is in the tray; false until the taskbar accepted it
 }
 
 func runTray(o options) {
@@ -237,10 +238,25 @@ func (t *tray) create() error {
 	t.nid = notifyIconData{hwnd: hwnd, id: 1, flags: nifMessage | nifIcon | nifTip, callbackMessage: wmTrayCallback}
 	t.nid.size = uint32(unsafe.Sizeof(t.nid))
 	t.refresh()
-	if ok, _, err := procShellNotifyIconW.Call(nimAdd, uintptr(unsafe.Pointer(&t.nid))); ok == 0 {
-		return fmt.Errorf("Shell_NotifyIcon: %w", err)
+	if err := t.add(); err != nil {
+		// Started at logon, the taskbar is often not there yet. Keep measuring and uploading, and add the icon
+		// once the taskbar announces itself ("TaskbarCreated") or on a later timer tick.
+		log.Printf("Shell_NotifyIcon: %v; will retry when the taskbar is ready", err)
 	}
 	procSetTimer.Call(hwnd, 1, 5000, 0) // keep the tooltip's "minutes ago" and the color current
+	return nil
+}
+
+// add puts the icon in the tray. It is called again when it failed, and after Explorer restarts.
+func (t *tray) add() error {
+	ok, _, err := procShellNotifyIconW.Call(nimAdd, uintptr(unsafe.Pointer(&t.nid)))
+	if ok == 0 {
+		return err
+	}
+	if !t.shown {
+		t.shown = true
+		log.Print("tray icon added")
+	}
 	return nil
 }
 
@@ -264,7 +280,11 @@ func (t *tray) wndProc(hwnd, message, wParam, lParam uintptr) uintptr {
 		return 0
 	case wmTimer:
 		t.refresh()
-		procShellNotifyIconW.Call(nimModify, uintptr(unsafe.Pointer(&t.nid)))
+		if t.shown {
+			procShellNotifyIconW.Call(nimModify, uintptr(unsafe.Pointer(&t.nid)))
+		} else {
+			t.add()
+		}
 		return 0
 	case wmQueryEndSession:
 		return 1
@@ -274,7 +294,8 @@ func (t *tray) wndProc(hwnd, message, wParam, lParam uintptr) uintptr {
 		}
 		return 0
 	case t.taskbarMsg:
-		procShellNotifyIconW.Call(nimAdd, uintptr(unsafe.Pointer(&t.nid)))
+		t.shown = false // a new taskbar has none of the old icons
+		t.add()
 		return 0
 	}
 	r, _, _ := procDefWindowProcW.Call(hwnd, message, wParam, lParam)

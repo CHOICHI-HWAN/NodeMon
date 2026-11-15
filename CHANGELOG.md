@@ -7,6 +7,9 @@ NodeMon is an independent project, not affiliated with Netdata, Inc.
 
 ## [Unreleased]
 
+### Fixed
+- Windows: after a restart, the tray connector could exit right after logon because the taskbar was not ready yet to take its icon, and Task Scheduler does not restart a program that exits with an error. It now keeps measuring and uploading, and adds the icon once the taskbar is there.
+
 ## [0.1.3] - 2026-11-15
 
 ### Added
