@@ -8,6 +8,9 @@ NodeMon is an independent project, not affiliated with Netdata, Inc.
 ## [Unreleased]
 
 ### Added
+- App icons: a new NodeMon mark (three rising bars and a live dot) for the browser tab and the iPhone/Android home screen ("Add to Home Screen" now opens the dashboard like an app), and the same mark on the Linux/macOS status icon, now drawn with smooth edges.
+
+### Added
 - A status icon for Linux (next to the clock) and macOS (menu bar): `nodemon-tray` shows whether the connector is running and uploading (green, amber, red). The connector now writes `status.json` next to its credentials for it, and the Linux and macOS ZIPs include the icon program. GNOME needs the AppIndicator extension to show it.
 
 ## [0.1.2] - 2026-11-14

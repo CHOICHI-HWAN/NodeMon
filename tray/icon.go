@@ -3,10 +3,10 @@ package main
 
 import (
 	"bytes"
-	"image"
 	"image/color"
 	"image/png"
-	"math"
+
+	"github.com/choichi-hwan/nodemon/tray/internal/art"
 )
 
 // colors are gray while starting, green when uploads go through, amber on a problem, red when stopped.
@@ -17,33 +17,10 @@ var colors = map[state]color.RGBA{
 	stateStopped:  {0xd6, 0x45, 0x45, 0xff},
 }
 
-// makeIcon draws a round dot with a darker ring and a small white bar chart inside, as a PNG. It is made in code so
-// the program needs no image files.
+// makeIcon draws NodeMon's mark (three rising bars) on a rounded tile in the state's color, as a PNG.
 func makeIcon(c color.RGBA) []byte {
-	const size = 64
-	img := image.NewRGBA(image.Rect(0, 0, size, size))
-	mid := float64(size-1) / 2
-	ring := color.RGBA{c.R / 2, c.G / 2, c.B / 2, 0xff}
-	white := color.RGBA{0xff, 0xff, 0xff, 0xff}
-	bars := [][2]int{{18, 40}, {29, 26}, {40, 32}} // x start, top y; every bar is 7 wide and ends at y=46
-	for y := 0; y < size; y++ {
-		for x := 0; x < size; x++ {
-			d := math.Hypot(float64(x)-mid, float64(y)-mid)
-			switch {
-			case d > 31:
-				continue // outside the dot stays transparent
-			case d > 27:
-				img.SetRGBA(x, y, ring)
-			default:
-				img.SetRGBA(x, y, c)
-			}
-			for _, b := range bars {
-				if x >= b[0] && x < b[0]+7 && y >= b[1] && y <= 46 {
-					img.SetRGBA(x, y, white)
-				}
-			}
-		}
-	}
+	lighten := func(v uint8) uint8 { return v + (255-v)/5 }
+	img := art.Render(64, art.Params{Top: color.RGBA{lighten(c.R), lighten(c.G), lighten(c.B), 0xff}, Bottom: c, Corner: 0.22})
 	var out bytes.Buffer
 	_ = png.Encode(&out, img)
 	return out.Bytes()
