@@ -150,6 +150,7 @@ type tray struct {
 	hwnd       uintptr
 	icon       uintptr
 	iconState  int
+	added      bool // the icon is in the notification area; false while Windows still refuses it
 	taskbarMsg uint32
 	nid        notifyIconData
 }
@@ -237,8 +238,13 @@ func (t *tray) create() error {
 	t.nid = notifyIconData{hwnd: hwnd, id: 1, flags: nifMessage | nifIcon | nifTip, callbackMessage: wmTrayCallback}
 	t.nid.size = uint32(unsafe.Sizeof(t.nid))
 	t.refresh()
+	// Started at logon, the task can run before Explorer has made the taskbar, and Windows then refuses the icon
+	// ("Unspecified error"). Keep trying every few seconds in the timer below; the connector works meanwhile, and the
+	// icon also arrives by itself when the taskbar appears (TaskbarCreated).
 	if ok, _, err := procShellNotifyIconW.Call(nimAdd, uintptr(unsafe.Pointer(&t.nid))); ok == 0 {
-		return fmt.Errorf("Shell_NotifyIcon: %w", err)
+		log.Printf("Shell_NotifyIcon: %v (will keep trying)", err)
+	} else {
+		t.added = true
 	}
 	procSetTimer.Call(hwnd, 1, 5000, 0) // keep the tooltip's "minutes ago" and the color current
 	return nil
@@ -264,6 +270,13 @@ func (t *tray) wndProc(hwnd, message, wParam, lParam uintptr) uintptr {
 		return 0
 	case wmTimer:
 		t.refresh()
+		if !t.added {
+			if ok, _, _ := procShellNotifyIconW.Call(nimAdd, uintptr(unsafe.Pointer(&t.nid))); ok != 0 {
+				t.added = true
+				log.Print("the tray icon is up")
+			}
+			return 0
+		}
 		procShellNotifyIconW.Call(nimModify, uintptr(unsafe.Pointer(&t.nid)))
 		return 0
 	case wmQueryEndSession:
@@ -274,7 +287,9 @@ func (t *tray) wndProc(hwnd, message, wParam, lParam uintptr) uintptr {
 		}
 		return 0
 	case t.taskbarMsg:
-		procShellNotifyIconW.Call(nimAdd, uintptr(unsafe.Pointer(&t.nid)))
+		if ok, _, _ := procShellNotifyIconW.Call(nimAdd, uintptr(unsafe.Pointer(&t.nid))); ok != 0 {
+			t.added = true
+		}
 		return 0
 	}
 	r, _, _ := procDefWindowProcW.Call(hwnd, message, wParam, lParam)
