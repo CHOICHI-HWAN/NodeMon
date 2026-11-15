@@ -20,7 +20,7 @@ var colors = map[state]color.RGBA{
 // makeIcon draws NodeMon's mark (three rising bars) on a rounded tile in the state's color, as a PNG.
 func makeIcon(c color.RGBA) []byte {
 	lighten := func(v uint8) uint8 { return v + (255-v)/5 }
-	img := art.Render(64, art.Params{Top: color.RGBA{lighten(c.R), lighten(c.G), lighten(c.B), 0xff}, Bottom: c, Corner: 0.22, Scale: 1.3})
+	img := art.Render(64, art.Params{Top: color.RGBA{lighten(c.R), lighten(c.G), lighten(c.B), 0xff}, Bottom: c, Corner: 0.22, Scale: 1.12})
 	var out bytes.Buffer
 	_ = png.Encode(&out, img)
 	return out.Bytes()

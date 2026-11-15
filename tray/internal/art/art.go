@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package art draws NodeMon's mark (three rising bars and a small "live" dot on a colored tile). The tray icon and the
-// dashboard's app icons (browser tab, iPhone home screen) are all drawn from it, so they stay one family. Drawing in
-// code means no image files have to be kept in sync with the program.
+// Package art draws NodeMon's mark: a small smiling satellite (solar panels, an antenna with a "live" ball) on a colored
+// tile. The tray icon and the dashboard's app icons (browser tab, iPhone home screen) are all drawn from it, so they
+// stay one family. Drawing in code means no image files have to be kept in sync with the program.
 package art
 
 import (
@@ -15,41 +15,79 @@ import (
 type Params struct {
 	Top, Bottom color.RGBA // the tile's color fades from Top (upper left) to Bottom (lower right)
 	Corner      float64    // corner radius as a share of the size; 0 fills the whole square (what iOS wants, it rounds the corners itself)
-	Scale       float64    // how large the bars are drawn around the center (0 means 1); small icons use more of the tile
-	Dot         bool       // the live dot above the bars
-	DotColor    color.RGBA
+	Scale       float64    // how large the satellite is drawn around the center (0 means 1); small icons use more of the tile
+	Detail      bool       // the face and the panel cells; too fine to read at menu bar size
+	DotColor    color.RGBA // the antenna ball; white when left empty
 }
 
-// Everything is described on a 512-unit canvas and scaled to the requested size.
-const unit = 512.0
+// Everything is described on a 512-unit canvas and scaled to the requested size. The satellite is drawn in its own
+// frame (u to the right, v down, origin at its center) and tilted so the panels point up to the right.
+const (
+	unit  = 512.0
+	tilt  = 28 * math.Pi / 180
+	baseY = 270.0 // a little below the middle, because the antenna adds height on top
+)
 
-var bars = [][4]float64{ // x, top, width, bottom; the ends are rounded
-	{120, 252, 64, 372},
-	{224, 140, 64, 372},
-	{328, 202, 64, 372},
+type paint int
+
+const (
+	none    paint = iota
+	white         // the satellite
+	cut           // shows the tile's own color again: panel cells, eyes, smile
+	antenna       // the ball on top
+)
+
+func inRoundRect(u, v, cu, cv, w, h, r float64) bool {
+	dx := math.Max(math.Abs(u-cu)-(w/2-r), 0)
+	dy := math.Max(math.Abs(v-cv)-(h/2-r), 0)
+	return dx*dx+dy*dy <= r*r
 }
 
-func inRoundBar(x, y float64, b [4]float64) bool {
-	r := b[2] / 2
-	cx := b[0] + r
-	switch {
-	case y < b[1] || y > b[3] || x < b[0] || x > b[0]+b[2]:
-		return false
-	case y < b[1]+r:
-		return math.Hypot(x-cx, y-(b[1]+r)) <= r
-	case y > b[3]-r:
-		return math.Hypot(x-cx, y-(b[3]-r)) <= r
+// satellite says what is drawn at one point of its own frame.
+func satellite(u, v float64, detail bool) paint {
+	au := math.Abs(u)
+	// The antenna: a stem and a ball.
+	if math.Hypot(u, v+104) <= 17 {
+		return antenna
 	}
-	return true
+	if au <= 5 && v >= -92 && v <= -50 {
+		return white
+	}
+	// The body.
+	if inRoundRect(u, v, 0, 0, 112, 112, 32) {
+		if detail {
+			if math.Hypot(au-21, v+6) <= 9 { // eyes
+				return cut
+			}
+			if d := math.Hypot(u, v-6); v >= 14 && math.Abs(d-22) <= 4.5 { // smile
+				return cut
+			}
+		}
+		return white
+	}
+	// The arms and the two solar panels.
+	if au >= 50 && au <= 82 && math.Abs(v) <= 8 {
+		return white
+	}
+	if au >= 82 && au <= 192 && inRoundRect(au, v, 137, 0, 110, 104, 14) {
+		if detail && (math.Abs(au-137) <= 3 || math.Abs(v) <= 3) { // cells
+			return cut
+		}
+		return white
+	}
+	return none
 }
 
 func inTile(x, y, radius float64) bool {
+	if x < 0 || x > unit || y < 0 || y > unit {
+		return false
+	}
 	if radius <= 0 {
-		return x >= 0 && x <= unit && y >= 0 && y <= unit
+		return true
 	}
 	dx := math.Max(math.Max(radius-x, x-(unit-radius)), 0)
 	dy := math.Max(math.Max(radius-y, y-(unit-radius)), 0)
-	return dx*dx+dy*dy <= radius*radius && x >= 0 && x <= unit && y >= 0 && y <= unit
+	return dx*dx+dy*dy <= radius*radius
 }
 
 func mix(a, b color.RGBA, t float64) color.RGBA {
@@ -61,13 +99,18 @@ func mix(a, b color.RGBA, t float64) color.RGBA {
 func Render(size int, p Params) *image.RGBA {
 	const ss = 4
 	img := image.NewRGBA(image.Rect(0, 0, size, size))
-	white := color.RGBA{0xff, 0xff, 0xff, 0xff}
-	radius := p.Corner * unit
-	scale := unit / float64(size)
+	snow := color.RGBA{0xff, 0xff, 0xff, 0xff}
+	ball := p.DotColor
+	if ball.A == 0 {
+		ball = snow
+	}
 	glyph := p.Scale
 	if glyph == 0 {
 		glyph = 1
 	}
+	radius := p.Corner * unit
+	scale := unit / float64(size)
+	sin, cos := math.Sincos(tilt)
 	for py := 0; py < size; py++ {
 		for px := 0; px < size; px++ {
 			var r, g, b, cover float64
@@ -79,15 +122,12 @@ func Render(size int, p Params) *image.RGBA {
 						continue
 					}
 					c := mix(p.Top, p.Bottom, math.Min(1, math.Max(0, (x+y)/(2*unit))))
-					gx, gy := unit/2+(x-unit/2)/glyph, unit/2+(y-unit/2)/glyph // the bars live on the unscaled canvas
-					for _, bar := range bars {
-						if inRoundBar(gx, gy, bar) {
-							c = white
-							break
-						}
-					}
-					if p.Dot && math.Hypot(gx-404, gy-134) <= 32 {
-						c = p.DotColor
+					dx, dy := (x-unit/2)/glyph, (y-baseY)/glyph
+					switch satellite(dx*cos-dy*sin, dx*sin+dy*cos, p.Detail) {
+					case white:
+						c = snow
+					case antenna:
+						c = ball
 					}
 					r, g, b, cover = r+float64(c.R), g+float64(c.G), b+float64(c.B), cover+1
 				}
