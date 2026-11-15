@@ -7,6 +7,9 @@ NodeMon is an independent project, not affiliated with Netdata, Inc.
 
 ## [Unreleased]
 
+### Fixed
+- Windows: the tray icon no longer gives up with "Shell_NotifyIcon: Unspecified error" when it starts before the taskbar is ready (for example right at logon). It keeps trying every few seconds while the connector works, and notes the problem in connector.log.
+
 ## [0.1.3] - 2026-11-15
 
 ### Added
